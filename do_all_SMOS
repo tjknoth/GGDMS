@@ -1,0 +1,26 @@
+#!/bin/bash
+# Run all data generation, processing, and plot/table creation for SMOS
+STARTTIME="$(date)"
+TODAY="$(date +"%Y%m%d")"
+
+./SMOSanalyze
+
+./SMOStimingsOSDistrAll
+
+./SMOStimingsOSDistrUniform
+
+./SMOStimingsTableData
+
+./SMOStimingsVectorGrowth
+
+./SMOStimingsCPUvGPU
+
+./readscript
+
+./CPUGPUreadscript
+
+nohup matlab -nodisplay < SMOS_make_plots_tables.m > makeplots_out$TODAY.txt
+
+ENDTIME="$(date)"
+
+echo "do_all_SMOS began $STARTTIME and ended $ENDTIME."
