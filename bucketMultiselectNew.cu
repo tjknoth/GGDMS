@@ -960,10 +960,17 @@ timing(0,6)
   while (newInputLength > 0) {
     // Initialization?
 
+    /* Recreate sub-buckets
+     *
+     */
+
     recreateBuckets<T><<<numBlocks,threadsPerBlock>>>( /* parameters */);
     SAFEcuda("recreateBuckets");
 
-    
+    /* Identify active buckets
+     *
+     */
+
     sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount, 
                                                                numBuckets, numBlocks);
     SAFEcuda("sumCounts");
@@ -976,19 +983,20 @@ timing(0,6)
     // kth bucket.
     //  get the index of the first element
     //  add the number of elements
-    uniqueBuckets[0] = kthBuckets[0];
-    reindexCounter[0] = 0;
+
+    d_uniqueBuckets[0] = kthBuckets[0];
+    d_reindexCounter[0] = 0;
     numUniqueBuckets = 1;
     kVals[0] -= kthBucketScanner[0];
-    // Change to device
+
     for (int i = 1; i < numKs; i++) {
       if (kthBuckets[i] != kthBuckets[i-1]) {
-        uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
-        reindexCounter[numUniqueBuckets] = 
-          reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
+        d_uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
+        d_reindexCounter[numUniqueBuckets] = 
+          d_reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
         numUniqueBuckets++;
       }
-      kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
+      kVals[i] = d_reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
     }
 
     newInputLength = reindexCounter[numUniqueBuckets-1] 
@@ -1000,6 +1008,37 @@ timing(0,6)
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
 
+    /* Check whether buckets are still valid, unmark if a bucket is finished
+     *
+     */
+
+    checkBuckets<T><<<numBlocks,threadsPerBlock>>>(/* parameters*/);
+    SAFEcuda("checkBuckets");
+    
+    /* Reduce problem
+     *
+     */
+
+    CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
+   
+    int numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
+    if (numUnique_extended > numUniqueBuckets+1){
+      numUnique_extended--;
+    } else {
+      numUnique_extended = (numUnique_extended << 1 ) - 1;
+    }
+
+    copyElements_tree<T><<<numBlocks, threadsPerBlock, 
+        numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
+                                             d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
+                                             d_bucketCount, numBuckets);
+    SAFEcuda("copyElements");
+    
+    // They don't free d_vector memory?
+    
+    T* temp = d_vector;
+    d_vector = newInput;
+    cudaFree(temp);
   } // end while
 
 timing(1,6);
