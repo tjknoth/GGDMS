@@ -25,16 +25,6 @@
 #include <ctime>
 
 
-/*   CHANGES
- *   CHANGES
- *   HOW DOES THIS WORK
- *   WHAT AM I DOING
- *
- */
-
-
-
-
 namespace BucketMultiselect{
   using namespace std;
 
@@ -46,8 +36,6 @@ namespace BucketMultiselect{
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) {      \
       printf("Error at %s:%d\n",__FILE__,__LINE__);     \
       return EXIT_FAILURE;}} while(0)
-
-	// Testing simultaneous git pushes
 
   /// ***********************************************************
   /// ***********************************************************
