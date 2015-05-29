@@ -25,16 +25,6 @@
 #include <ctime>
 
 
-/*   CHANGES
- *   CHANGES
- *   HOW DOES THIS WORK
- *   WHAT AM I DOING
- *
- */
-
-
-
-
 namespace BucketMultiselect{
   using namespace std;
 
