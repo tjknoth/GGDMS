@@ -413,6 +413,37 @@ namespace BucketMultiselect{
 
 
 
+  /* Function to split existing buckets into sub-buckets and allocate data accordingly
+   *
+   * Notes: Make sure slopes is allocated. Get endpoints.
+   */
+  template <typename T>
+  __global__ void recreateBuckets (T* d_vector, int numBuckets, double* originalSlopes, T* pivots,
+                                   , uint* elementToBucket, uint* endpoints, uint* d_bucketCount
+                                   , int offset, int length, int numBlocks) {
+    int idx = blockId.x * blockDim.x + threadId.x;
+
+    if (blockId.x < numBuckets) {
+      
+      __shared__ T min = (elementToBucket[blockId.x] - endpoints[blockId.x]) / originalSlopes[blockId.x]; //CALCULATE THIS
+      T max = (elementToBucket[blockId.x] - endpoints[blockId.x] + 1);
+      __shared__ double slope = (max - min) / d_bucketCount[blockId.x * numBlocks]; //Check idx
+    } //endif
+
+    syncthreads();
+
+    if (blockId.x < numBuckets) {
+      int bucketSize = d_bucketCount[idx * numBlocks]
+        for (int i = idx; i < bucketSize; i += blockDim.x) {
+          int index = i + endpoints[blockId.x];
+          elementToBucket[index] = slope * (d_vector[index] - min); 
+        } //end for
+      originalSlopes[blockId.x] = slope;
+    } //end if
+  }
+
+
+
 
 
   /* This function speeds up the copying process the requested kVals by clustering them
