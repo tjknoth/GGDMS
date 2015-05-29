@@ -25,15 +25,6 @@
 #include <ctime>
 
 
-/*   CHANGES
- *   CHANGES
- *   HOW DOES THIS WORK
- *   WHAT AM I DOING
- *
- */
-
-
-
 
 namespace BucketMultiselect{
   using namespace std;
@@ -47,8 +38,8 @@ namespace BucketMultiselect{
       printf("Error at %s:%d\n",__FILE__,__LINE__);     \
       return EXIT_FAILURE;}} while(0)
 
-	// Testing simultaneous git pushes
-	// Still testing
+ 	// Testing simultaneous
+
   /// ***********************************************************
   /// ***********************************************************
   /// **** HELPER CPU FUNCTIONS
