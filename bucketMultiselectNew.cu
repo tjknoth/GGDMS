@@ -429,7 +429,7 @@ namespace BucketMultiselect{
       int bigBucket = (int) ((idx * numBigBuckets) / numBuckets);
       __shared__ T min = (blockId.x - (bigBucket * (numBuckets / numBigBuckets)) / originalSlopes[bigBucket]) + pivots[bigBucket];
       T max = (blockId.x - (bigBucket * (numBuckets / numBigBuckets) + 1) / originalSlopes[bigBucket]) + pivots[bigBucket];
-      __shared__ double slope = (max - min) / d_bucketCount[numBuckets * (numBlocks - 1) + blockId.x];
+      __shared__ double slope = d_bucketCount[numBuckets * (numBlocks - 1) + blockId.x]/(max - min);
     } 
 
     syncthreads();
