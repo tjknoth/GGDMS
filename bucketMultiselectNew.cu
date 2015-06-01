@@ -454,7 +454,7 @@ namespace BucketMultiselect{
     int idx = blockId.x * blockDim.x + threadId.x;
 
     if (idx < numBuckets) {
-      if (slopes[idx] * d_bucketCount[idx * numBlocks] < MIN_SLOPE) {
+      if (slopes[idx] * d_bucketCount[numBuckets * (numBlocks - 1) + idx] < MIN_SLOPE) {
         orderStats[idx] = d_vector[d_bucketCount[idx * numBlocks - 1]];
         markedBuckets[idx] = 0;
       }
