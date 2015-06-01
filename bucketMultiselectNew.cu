@@ -34,6 +34,7 @@ namespace BucketMultiselect{
 #define MAX_THREADS_PER_BLOCK 1024
 #define CUTOFF_POINT 200000 
 #define TIMING_ON
+#define MIN_SLOPE 2 ^ -1022
 //#define SAFE
 
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) {      \
@@ -420,30 +421,45 @@ namespace BucketMultiselect{
   template <typename T>
   __global__ void recreateBuckets (T* d_vector, int numBuckets, double* originalSlopes, T* pivots,
                                    , uint* elementToBucket, uint* endpoints, uint* d_bucketCount
-                                   , int offset, int length, int numBlocks) {
+                                   , int offset, int length, int numBlocks, int numBigBuckets) {
     int idx = blockId.x * blockDim.x + threadId.x;
 
     if (blockId.x < numBuckets) {
-      
-      __shared__ T min = (elementToBucket[blockId.x] - endpoints[blockId.x]) / originalSlopes[blockId.x]; //CALCULATE THIS
-      T max = (elementToBucket[blockId.x] - endpoints[blockId.x] + 1);
-      __shared__ double slope = (max - min) / d_bucketCount[blockId.x * numBlocks]; //Check idx
-    } //endif
+      int bigBucket = (int) ((idx * numBigBuckets) / numBuckets);
+      __shared__ T min = (blockId.x - (bigBucket * (numBuckets / numBigBuckets)) / originalSlopes[bigBucket]) + pivots[bigBucket];
+      T max = (blockId.x - (bigBucket * (numBuckets / numBigBuckets) + 1) / originalSlopes[bigBucket]) + pivots[bigBucket];
+      __shared__ double slope = (max - min) / d_bucketCount[numBuckets * (numBlocks - 1) + blockId.x];
+    } 
 
     syncthreads();
 
     if (blockId.x < numBuckets) {
-      int bucketSize = d_bucketCount[idx * numBlocks]
+      int bucketSize = d_bucketCount[numBuckets * (numBlocks - 1) + blockId.x];
         for (int i = idx; i < bucketSize; i += blockDim.x) {
           int index = i + endpoints[blockId.x];
-          elementToBucket[index] = slope * (d_vector[index] - min); 
-        } //end for
+          elementToBucket[index] = (int) (slope * (d_vector[index] - min)); 
+        }
       originalSlopes[blockId.x] = slope;
     } //end if
   }
 
 
 
+  /* Function to check if any order statistics have been found, unmarks buckets if so
+   *
+   */
+  template <typename T>
+  __global__ void checkBuckets (int numBuckets, double* slopes, int* d_bucketCount
+                                , int numBlocks, T* orderStats, T* d_vector, uint* markedBuckets) {
+    int idx = blockId.x * blockDim.x + threadId.x;
+
+    if (idx < numBuckets) {
+      if (slopes[idx] * d_bucketCount[idx * numBlocks] < MIN_SLOPE) {
+        orderStats[idx] = d_vector[d_bucketCount[idx * numBlocks - 1]];
+        markedBuckets[idx] = 0;
+      }
+    }
+  }
 
 
   /* This function speeds up the copying process the requested kVals by clustering them
