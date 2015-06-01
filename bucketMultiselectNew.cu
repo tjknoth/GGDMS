@@ -448,16 +448,26 @@ namespace BucketMultiselect{
   /* Function to check if any order statistics have been found, unmarks buckets if so
    *
    */
+
   template <typename T>
   __global__ void checkBuckets (int numBuckets, double* slopes, int* d_bucketCount
                                 , int numBlocks, T* orderStats, T* d_vector, uint* markedBuckets) {
     int idx = blockId.x * blockDim.x + threadId.x;
 
+    // One thread per bucket
+
     if (idx < numBuckets) {
+
+ 	// Check whether the max - min is less than double-precision tolerance
+	
       if (slopes[idx] * d_bucketCount[numBuckets * (numBlocks - 1) + threadId.x] < MIN_SLOPE) {
+
+	// Sum the last row of d_bucketCount to find the number of elements in the previous
+	// buckets
+	
 	int cumulativeCount = 0;
-	for(int i = 0; i < blockId.x+1, i++) {
-		cumulativeCount += d_bucketCount[numBuckets * (numBlocks - 1) + i]
+	for (int i = 0; i < blockId.x+1, i++) {
+		cumulativeCount += d_bucketCount[numBuckets * (numBlocks - 1) + i];
 	}
         orderStats[idx] = d_vector[cumulativeCount];
         markedBuckets[idx] = 0;
