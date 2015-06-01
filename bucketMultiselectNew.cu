@@ -1018,7 +1018,7 @@ timing(1,5);
     /// **** 
     /// ***********************************************************
 timing(0,6)
-     
+  
 
   while (newInputLength > 0) {
     // Initialization?
@@ -1027,7 +1027,9 @@ timing(0,6)
      *
      */
 
-    recreateBuckets<T><<<numBlocks,threadsPerBlock>>>( /* parameters */);
+    recreateBuckets<T><<<numBlocks,threadsPerBlock>>>(d_vector, numBuckets, slopes, pivots 
+                                                      , elementToBucket, kthBucketScanner, d_bucketCount
+                                                      , offset, length, numBlocks, numUniqueBuckets);
     SAFEcuda("recreateBuckets");
 
     /* Identify active buckets
@@ -1065,6 +1067,11 @@ timing(0,6)
     newInputLength = reindexCounter[numUniqueBuckets-1] 
       + h_bucketCount[kthBuckets[numKs - 1]];
 
+    CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
+                         numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
+                         numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+
 
     reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
       threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
@@ -1075,7 +1082,8 @@ timing(0,6)
      *
      */
 
-    checkBuckets<T><<<numBlocks,threadsPerBlock>>>(/* parameters*/);
+    checkBuckets<T><<<numBlocks,threadsPerBlock>>>(numBuckets, slopes, d_bucketCount, numBlocks, outputs
+                                                   , d_vector, markedBuckets);
     SAFEcuda("checkBuckets");
     
     /* Reduce problem
