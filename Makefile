@@ -46,13 +46,13 @@ CPUProcessData
 
 CompareMultiselect = \
 compareMultiselect.cu \
-bucketMultiselect.cu naiveBucketMultiselect.cu \
+bucketMultiselectNew.cu naiveBucketMultiselect.cu \
 bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
 generateProblems.cu multiselectTimingFunctions.cu
 
 AnalyzeMultiselect = \
 analyzeMultiselect.cu \
-bucketMultiselect.cu \
+bucketMultiselectNew.cu \
 multiselectTimingFunctions.cu
 
 RealDataTests = \

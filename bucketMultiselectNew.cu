@@ -424,7 +424,7 @@ namespace BucketMultiselect{
                                    , int offset, int length, int numBlocks, int numBigBuckets) {
     int idx = blockId.x * blockDim.x + threadId;
 
-    // Calculate slope, min for each active bucket.
+    // Calculate slope, min for each active bucket and store in shared memory.
     if (blockId.x < numBuckets) {
       int bigBucket = (int) ((idx * numBigBuckets) / numBuckets);
       __shared__ T min = (blockId.x - (bigBucket * (numBuckets / numBigBuckets)) / originalSlopes[bigBucket]) + pivots[bigBucket];
@@ -1021,25 +1021,21 @@ timing(0,6)
   
 
   while (newInputLength > 0) {
-    // Initialization?
 
-    /* Recreate sub-buckets
-     *
-     */
+    // Recreate sub-buckets
 
     recreateBuckets<T><<<numBlocks,threadsPerBlock>>>(d_vector, numBuckets, slopes, pivots 
                                                       , elementToBucket, kthBucketScanner, d_bucketCount
                                                       , offset, length, numBlocks, numUniqueBuckets);
     SAFEcuda("recreateBuckets");
 
-    /* Identify active buckets
-     *
-     */
+    // Identify active buckets
 
     sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount, 
                                                                numBuckets, numBlocks);
     SAFEcuda("sumCounts");
 
+    // Mark the buckets containing relevant order statistics
     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
                  kthBucketScanner, kthBuckets, numBlocks);
     SAFEcuda("findKBuckets");
@@ -1048,7 +1044,6 @@ timing(0,6)
     // kth bucket.
     //  get the index of the first element
     //  add the number of elements
-
     d_uniqueBuckets[0] = kthBuckets[0];
     d_reindexCounter[0] = 0;
     numUniqueBuckets = 1;
@@ -1072,23 +1067,18 @@ timing(0,6)
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
 
-
     reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
       threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
 
-    /* Check whether buckets are still valid, unmark if a bucket is finished
-     *
-     */
+    // Check whether buckets are still valid, unmark if a bucket only contains one value
 
     checkBuckets<T><<<numBlocks,threadsPerBlock>>>(numBuckets, slopes, d_bucketCount, numBlocks, outputs
                                                    , d_vector, markedBuckets);
     SAFEcuda("checkBuckets");
     
-    /* Reduce problem
-     *
-     */
+    // Reduce problem by deleting all irrelevant buckets and duplicates
 
     CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
    
@@ -1105,15 +1095,26 @@ timing(0,6)
                                              d_bucketCount, numBuckets);
     SAFEcuda("copyElements");
     
-    // They don't free d_vector memory?
-    
+    // Free old vector and reassign updated vector
     T* temp = d_vector;
     d_vector = newInput;
     cudaFree(temp);
   } // end while
 
-timing(1,6);
-    return 1;
+ cudaFree(d_pivots);
+ cudaFree(d_pivottree);
+ cudaFree(d_slopes);  
+ free(h_bucketCount); 
+ cudaFree(d_bucketCount); 
+ cudaFree(d_uniqueBuckets); 
+ cudaFree(d_reindexCounter);  
+ cudaFree(d_elementToBucket);  
+ cudaFree(d_kIndices); 
+ cudaFree(d_kVals); 
+ cudaFree(newInput); 
+ free(kIndices - kOffsetMin);
+ timing(1,6);
+ return 1;
   }
 
 
