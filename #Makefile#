@@ -4,7 +4,7 @@ CUDA_INSTALL_PATH ?= /usr/local/cuda
 CPP := g++
 CC := gcc
 LINK := g++ -fPIC
-NVCC := nvcc #-ccbin /usr/bin
+NVCC := nvcc # -ccbin /usr/bin
 .SUFFIXES: .c .cpp .cu .o
 
 # Includes

@@ -1,0 +1,546 @@
+268435456,101,UNIFORM DOUBLES,Uniform Ks,Sort and Choose Multiselect,37.2474,Bucket Multiselect,90.813,
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 1 kIndex = 0 wrong result = 1 correct result = 0.369154
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 268435 kIndex = 1 wrong result = 0.999001 correct result = 0.171554
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 536870 kIndex = 2 wrong result = 0.998001 correct result = 0.846672
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 805306 kIndex = 3 wrong result = 0.997 correct result = 0.06336
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 1073741 kIndex = 4 wrong result = 0.996004 correct result = 0.0216243
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 1342177 kIndex = 5 wrong result = 0.995002 correct result = 0.867924
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 1610612 kIndex = 6 wrong result = 0.994003 correct result = 0.776657
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 1879048 kIndex = 7 wrong result = 0.993004 correct result = 0.678254
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 2147483 kIndex = 8 wrong result = 0.992005 correct result = 0.147174
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 2415919 kIndex = 9 wrong result = 0.991002 correct result = 0.294388
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 2684354 kIndex = 10 wrong result = 0.990003 correct result = 0.829199
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 2952790 kIndex = 11 wrong result = 0.989002 correct result = 0.86588
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 3221225 kIndex = 12 wrong result = 0.988003 correct result = 0.546272
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 3489661 kIndex = 13 wrong result = 0.987004 correct result = 0.864373
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 3758096 kIndex = 14 wrong result = 0.986004 correct result = 0.590804
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 4026531 kIndex = 15 wrong result = 0.985005 correct result = 0.315597
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 4294967 kIndex = 16 wrong result = 0.984002 correct result = 0.695806
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 4563403 kIndex = 17 wrong result = 0.982999 correct result = 0.305283
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 4831838 kIndex = 18 wrong result = 0.981999 correct result = 0.673013
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 5100273 kIndex = 19 wrong result = 0.981 correct result = 0.970528
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 5368709 kIndex = 20 wrong result = 0.979997 correct result = 0.892558
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 5637144 kIndex = 21 wrong result = 0.978997 correct result = 0.820097
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 5905580 kIndex = 22 wrong result = 0.977993 correct result = 0.904057
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 6174015 kIndex = 23 wrong result = 0.976997 correct result = 0.842376
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 6442451 kIndex = 24 wrong result = 0.976 correct result = 0.803158
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 6710886 kIndex = 25 wrong result = 0.974999 correct result = 0.158128
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 6979322 kIndex = 26 wrong result = 0.974001 correct result = 0.28627
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 7247757 kIndex = 27 wrong result = 0.973001 correct result = 0.293703
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 7516193 kIndex = 28 wrong result = 0.971998 correct result = 0.37826
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 7784628 kIndex = 29 wrong result = 0.971 correct result = 0.505318
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 8053063 kIndex = 30 wrong result = 0.969998 correct result = 0.121249
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 8321499 kIndex = 31 wrong result = 0.968996 correct result = 0.245851
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 8589935 kIndex = 32 wrong result = 0.967999 correct result = 0.539818
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 8858370 kIndex = 33 wrong result = 0.966996 correct result = 0.301325
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 9126806 kIndex = 34 wrong result = 0.965995 correct result = 0.928999
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 9395241 kIndex = 35 wrong result = 0.964994 correct result = 0.736121
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 9663676 kIndex = 36 wrong result = 0.963992 correct result = 0.37026
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 9932112 kIndex = 37 wrong result = 0.962992 correct result = 0.157522
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 10200547 kIndex = 38 wrong result = 0.961992 correct result = 0.597648
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 10468983 kIndex = 39 wrong result = 0.96099 correct result = 0.739397
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 10737418 kIndex = 40 wrong result = 0.959989 correct result = 0.513644
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 11005854 kIndex = 41 wrong result = 0.958985 correct result = 0.12259
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 11274289 kIndex = 42 wrong result = 0.957984 correct result = 0.326877
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 11542725 kIndex = 43 wrong result = 0.956984 correct result = 0.56714
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 11811160 kIndex = 44 wrong result = 0.955987 correct result = 0.0123673
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 12079596 kIndex = 45 wrong result = 0.954987 correct result = 0.572421
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 12348031 kIndex = 46 wrong result = 0.953988 correct result = 0.732978
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 12616466 kIndex = 47 wrong result = 0.952988 correct result = 0.962567
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 12884902 kIndex = 48 wrong result = 0.951989 correct result = 0.0618406
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 13153337 kIndex = 49 wrong result = 0.950989 correct result = 0.825992
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 13421773 kIndex = 50 wrong result = 0.949991 correct result = 0.469477
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 13690208 kIndex = 51 wrong result = 0.948991 correct result = 0.553457
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 13958644 kIndex = 52 wrong result = 0.947986 correct result = 0.630763
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 14227079 kIndex = 53 wrong result = 0.946988 correct result = 0.335762
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 14495515 kIndex = 54 wrong result = 0.945988 correct result = 0.722029
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 14763950 kIndex = 55 wrong result = 0.944984 correct result = 0.185446
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 15032386 kIndex = 56 wrong result = 0.943989 correct result = 0.407139
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 15300821 kIndex = 57 wrong result = 0.94299 correct result = 0.31037
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 15569256 kIndex = 58 wrong result = 0.941989 correct result = 0.30137
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 15837692 kIndex = 59 wrong result = 0.94099 correct result = 0.295721
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 16106127 kIndex = 60 wrong result = 0.939988 correct result = 0.766804
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 16374563 kIndex = 61 wrong result = 0.93899 correct result = 0.494541
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 16642998 kIndex = 62 wrong result = 0.937988 correct result = 0.472903
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 16911434 kIndex = 63 wrong result = 0.936985 correct result = 0.264407
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 17179870 kIndex = 64 wrong result = 0.935985 correct result = 0.462322
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 17448304 kIndex = 65 wrong result = 0.934982 correct result = 0.822784
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 17716740 kIndex = 66 wrong result = 0.933984 correct result = 0.422268
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 17985176 kIndex = 67 wrong result = 0.932982 correct result = 0.471405
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 18253612 kIndex = 68 wrong result = 0.93198 correct result = 0.0729606
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 18522046 kIndex = 69 wrong result = 0.930984 correct result = 0.0593514
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 18790482 kIndex = 70 wrong result = 0.929984 correct result = 0.643551
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 19058918 kIndex = 71 wrong result = 0.928984 correct result = 0.516601
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 19327352 kIndex = 72 wrong result = 0.927984 correct result = 0.528518
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 19595788 kIndex = 73 wrong result = 0.926986 correct result = 0.178099
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 19864224 kIndex = 74 wrong result = 0.925987 correct result = 0.417726
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 20132660 kIndex = 75 wrong result = 0.924986 correct result = 0.491504
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 20401094 kIndex = 76 wrong result = 0.923986 correct result = 0.651879
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 20669530 kIndex = 77 wrong result = 0.922987 correct result = 0.431196
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 20937966 kIndex = 78 wrong result = 0.921984 correct result = 0.298916
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 21206402 kIndex = 79 wrong result = 0.920987 correct result = 0.923462
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 21474836 kIndex = 80 wrong result = 0.919987 correct result = 0.253351
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 21743272 kIndex = 81 wrong result = 0.918992 correct result = 0.570842
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 22011708 kIndex = 82 wrong result = 0.917993 correct result = 0.380491
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 22280142 kIndex = 83 wrong result = 0.916995 correct result = 0.947491
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 22548578 kIndex = 84 wrong result = 0.915995 correct result = 0.63981
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 22817014 kIndex = 85 wrong result = 0.914997 correct result = 0.623168
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 23085450 kIndex = 86 wrong result = 0.913999 correct result = 0.76524
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 23353884 kIndex = 87 wrong result = 0.912998 correct result = 0.805803
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 23622320 kIndex = 88 wrong result = 0.911997 correct result = 0.409493
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 23890756 kIndex = 89 wrong result = 0.910995 correct result = 0.0921187
+
+ERROR ON TEST 0 of 6 tests!!!!!
+vector size = 268435456
+vector seed = 868607107504152
+numKs = 101
+wrong k = 24159192 kIndex = 90 wrong result = 0.909995 correct result = 
