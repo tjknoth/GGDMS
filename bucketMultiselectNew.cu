@@ -422,8 +422,9 @@ namespace BucketMultiselect{
   __global__ void recreateBuckets (T* d_vector, int numBuckets, double* originalSlopes, T* pivots,
                                    , uint* elementToBucket, uint* endpoints, uint* d_bucketCount
                                    , int offset, int length, int numBlocks, int numBigBuckets) {
-    int idx = blockId.x * blockDim.x + threadId.x;
+    int idx = blockId.x * blockDim.x + threadId;
 
+    // Calculate slope, min for each active bucket.
     if (blockId.x < numBuckets) {
       int bigBucket = (int) ((idx * numBigBuckets) / numBuckets);
       __shared__ T min = (blockId.x - (bigBucket * (numBuckets / numBigBuckets)) / originalSlopes[bigBucket]) + pivots[bigBucket];
@@ -433,6 +434,7 @@ namespace BucketMultiselect{
 
     syncthreads();
 
+    // For each bucket, use one block to reassign bucket numbers.
     if (blockId.x < numBuckets) {
       int bucketSize = d_bucketCount[numBuckets * (numBlocks - 1) + blockId.x];
         for (int i = idx; i < bucketSize; i += blockDim.x) {
