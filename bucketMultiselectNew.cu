@@ -439,7 +439,9 @@ namespace BucketMultiselect{
       int bucketSize = d_bucketCount[numBuckets * (numBlocks - 1) + blockId.x];
         for (int i = idx; i < bucketSize; i += blockDim.x) {
           int index = i + endpoints[blockId.x];
-          elementToBucket[index] = (int) (slope * (d_vector[index] - min)); 
+          int bucketIndex = (int) (slope * (d_vector[index] - min))
+          elementToBucket[index] = bucketIndex; 
+          atomicInc(sharedBuckets + bucketIndex, length);
         }
       originalSlopes[blockId.x] = slope;
     } //end if
@@ -462,7 +464,7 @@ namespace BucketMultiselect{
 
  	// Check whether the max - min is less than double-precision tolerance
 	
-      if (slopes[idx] * d_bucketCount[numBuckets * (numBlocks - 1) + threadId.x] < MIN_SLOPE) {
+      if (d_bucketCount[numBuckets * (numBlocks - 1) + threadId.x] / slopes[idx] < MIN_SLOPE) {
 
 	// Sum the last row of d_bucketCount to find the number of elements in the previous
 	// buckets
