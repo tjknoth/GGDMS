@@ -501,7 +501,7 @@ namespace BucketMultiselectNew2{
 			blockToBucket[blockIdx.x] = elementToBucket[endpoints[blockIdx.x]];
 
 			// Find which of the previous buckets we are in
-			int hugeBucket = (int) (blockToBucket[blockIdx.x] / precount);
+			int hugeBucket = (int) (blockToBucket[blockIdx.x] / *precount);
 
 			// Calculate number of subbuckets per big bucket
 			numSubBuckets = (int) (numBuckets / numBigBuckets); 
