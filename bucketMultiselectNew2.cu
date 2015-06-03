@@ -484,7 +484,7 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
                                    uint * elementToBucket, uint* endpoints, uint* d_bucketCount
-                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * counts, uint * d_uniqueBuckets) {
+                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * d_uniqueBuckets) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	T min;
@@ -494,7 +494,7 @@ namespace BucketMultiselectNew2{
 	extern __shared__ uint * counts;
 
 	// Initialize counts
-	for (int i = idx; i < numBuckets; i += numUniqueBuckets * blockDim.x) {
+	for (int i = idx; i < numBuckets; i += numBigBuckets * blockDim.x) {
 		counts[i] = 0;
 	} // end for
 
@@ -1092,7 +1092,7 @@ timing(0,6);
 
     recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots 
                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
-                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, counts, d_uniqueBuckets);
+                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, d_uniqueBuckets);
 
     SAFEcuda("recreateBuckets");
 
