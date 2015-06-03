@@ -35,7 +35,7 @@ namespace BucketMultiselectNew2{
 #define CUTOFF_POINT 200000 
 #define TIMING_ON
 #define MIN_SLOPE 2 ^ -1022
-//#define SAFE
+  //#define SAFE
 
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) {      \
       printf("Error at %s:%d\n",__FILE__,__LINE__);     \
@@ -78,9 +78,9 @@ namespace BucketMultiselectNew2{
   }
 
   inline void timing(int option, int ind){
-    #ifdef TIMING_ON 
-      timing_switch(option, ind);
-    #endif
+#ifdef TIMING_ON 
+    timing_switch(option, ind);
+#endif
   }
 
 
@@ -96,15 +96,15 @@ namespace BucketMultiselectNew2{
   {
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
-	  fprintf(stderr, "Error: %s: %s\n", message, cudaGetErrorString(error) );
-	  exit(-1);
+      fprintf(stderr, "Error: %s: %s\n", message, cudaGetErrorString(error) );
+      exit(-1);
     }
   }
 
   inline void SAFEcuda(const char *message) {
-    #ifdef SAFE
-      Check_CUDA_Error(message);
-    #endif
+#ifdef SAFE
+    Check_CUDA_Error(message);
+#endif
   }
 
 
@@ -220,7 +220,7 @@ namespace BucketMultiselectNew2{
         int PivotIndex = 1;
 
         for(int j=1; j < numBigBuckets; j*=2){
-            PivotIndex = (PivotIndex << 1) + (num >= sharedPivotTree[PivotIndex-1]);
+          PivotIndex = (PivotIndex << 1) + (num >= sharedPivotTree[PivotIndex-1]);
         }
         PivotIndex = PivotIndex - numBigBuckets;
 
@@ -352,8 +352,8 @@ namespace BucketMultiselectNew2{
 
   template <typename T>
   __global__ void copyElements_tree (T* d_vector, int length, uint* elementToBucket
-                                , uint * uniqueBuckets, const int numUnique, const int numUnique_extended, T* newArray, uint offset
-                                , uint * d_bucketCount, int numTotalBuckets) {
+                                     , uint * uniqueBuckets, const int numUnique, const int numUnique_extended, T* newArray, uint offset
+                                     , uint * d_bucketCount, int numTotalBuckets) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int threadIndex;
@@ -375,9 +375,9 @@ namespace BucketMultiselectNew2{
 
         bucketidx = ((2*remainder + 1)*mid) / shift;
         if (bucketidx < numUnique) {
-           activeTree[threadIndex] = uniqueBuckets[bucketidx];
+          activeTree[threadIndex] = uniqueBuckets[bucketidx];
         } else {
-           activeTree[threadIndex] = uniqueBuckets[numUnique-1];
+          activeTree[threadIndex] = uniqueBuckets[numUnique-1];
         } // end if (bucketidx) {} else
       } // end if (threadIndex)
     }  // end for
@@ -414,9 +414,9 @@ namespace BucketMultiselectNew2{
 
 
 
-    template <typename T>
+  template <typename T>
   __global__ void copyElements_tree_recurse (T* d_vector, int length, uint* elementToBucket
-                                , uint * uniqueBuckets, const int numUnique, const int numUnique_extended, T* newArray, uint offset
+                                             , uint * uniqueBuckets, const int numUnique, const int numUnique_extended, T* newArray, uint offset
                                              , uint * d_bucketCount, int numTotalBuckets, int numBlocks) {
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -439,9 +439,9 @@ namespace BucketMultiselectNew2{
 
         bucketidx = ((2*remainder + 1)*mid) / shift;
         if (bucketidx < numUnique) {
-           activeTree[threadIndex] = uniqueBuckets[bucketidx];
+          activeTree[threadIndex] = uniqueBuckets[bucketidx];
         } else {
-           activeTree[threadIndex] = uniqueBuckets[numUnique-1];
+          activeTree[threadIndex] = uniqueBuckets[numUnique-1];
         } // end if (bucketidx) {} else
       } // end if (threadIndex)
     }  // end for
@@ -487,71 +487,71 @@ namespace BucketMultiselectNew2{
                                    , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * counts, uint * d_uniqueBuckets) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	T min;
-	double slope;
-	int previousBuckets;
-	int numSubBuckets;
-	extern __shared__ uint * counts;
+    T min;
+    double slope;
+    int previousBuckets;
+    int numSubBuckets;
+    extern __shared__ uint * counts;
 
-	// Initialize counts
-	for (int i = idx; i < numBuckets; i += numUniqueBuckets * blockDim.x) {
-		counts[i] = 0;
-	} // end for
+    // Initialize counts
+    for (int i = idx; i < numBuckets; i += numUniqueBuckets * blockDim.x) {
+      counts[i] = 0;
+    } // end for
 
-	syncthreads();
+    syncthreads();
 
     // One block is dedicated to each big bucket
     if (blockIdx.x < numBigBuckets) {
 
-		// One thread calculates shared values for the block
-		if (threadIdx.x < 1) {
+      // One thread calculates shared values for the block
+      if (threadIdx.x < 1) {
 
-			// Find which of the previous buckets we are in
-			int hugeBucket = (int) (d_uniqueBuckets[blockIdx.x] / *precount);
+        // Find which of the previous buckets we are in
+        int hugeBucket = (int) (d_uniqueBuckets[blockIdx.x] / *precount);
 
-			// Calculate number of subbuckets per big bucket
-			numSubBuckets = (int) (numBuckets / numBigBuckets); 
+        // Calculate number of subbuckets per big bucket
+        numSubBuckets = (int) (numBuckets / numBigBuckets); 
 										
-			// Calculate and store min and slope
-			min = ((d_uniqueBuckets[blockIdx.x] - (*precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
-			T max = ((d_uniqueBuckets[blockIdx.x] - (*precount * hugeBucket) + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
-			double slope = numSubBuckets/(max - min);
+        // Calculate and store min and slope
+        min = ((d_uniqueBuckets[blockIdx.x] - (*precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
+        T max = ((d_uniqueBuckets[blockIdx.x] - (*precount * hugeBucket) + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
+        double slope = numSubBuckets/(max - min);
 
-			// Calculate number of subbuckets for the previous big buckets
-			int previousBuckets = (int) numSubBuckets * blockIdx.x;
+        // Calculate number of subbuckets for the previous big buckets
+        int previousBuckets = (int) numSubBuckets * blockIdx.x;
 
-		} // end if
+      } // end if
 
 
-	    syncthreads();
+      syncthreads();
 
-		// Set the stopping condition for the for loop at the next bucket, or the end
-		// of the vector for the last bucket
-		int bucketEnd = 0;
-		if (blockIdx.x < numBigBuckets - 1){
-			bucketEnd = endpoints[blockIdx.x + 1];
-		} else {
-			bucketEnd = length;
-		} // end if-else
+      // Set the stopping condition for the for loop at the next bucket, or the end
+      // of the vector for the last bucket
+      int bucketEnd = 0;
+      if (blockIdx.x < numBigBuckets - 1){
+        bucketEnd = endpoints[blockIdx.x + 1];
+      } else {
+        bucketEnd = length;
+      } // end if-else
 
 	
-		// reassign bucket numbers
-		int start = endpoints[blockIdx.x];
-		for (int i = idx + start; i < bucketEnd; i += blockDim.x) {
-			int bucketIndex = (int) (slope * (d_vector[i] - min)) + previousBuckets;
-			elementToBucket[i] = bucketIndex; 
-			atomicInc(counts + bucketIndex, length);
-        }
-		originalSlopes[blockIdx.x] = slope;		
+      // reassign bucket numbers
+      int start = endpoints[blockIdx.x];
+      for (int i = idx + start; i < bucketEnd; i += blockDim.x) {
+        int bucketIndex = (int) (slope * (d_vector[i] - min)) + previousBuckets;
+        elementToBucket[i] = bucketIndex; 
+        atomicInc(counts + bucketIndex, length);
+      }
+      originalSlopes[blockIdx.x] = slope;		
     } // end if
 	
-	syncthreads();
+    syncthreads();
 
-	// copy counts to d_bucketCount	
+    // copy counts to d_bucketCount	
     int sumsRowIndex= numBuckets * (numBlocks-1);
-	for (int i = 0; i < numBlocks; i++) {
-		d_bucketCount[i + sumsRowIndex] = counts[i];
-	}
+    for (int i = 0; i < numBlocks; i++) {
+      d_bucketCount[i + sumsRowIndex] = counts[i];
+    }
     * precount = numSubBuckets;	
   } // end kernel
 
@@ -570,7 +570,7 @@ namespace BucketMultiselectNew2{
 
     if (idx < numBuckets) {
 
- 	// Check whether the max - min is less than double-precision tolerance
+      // Check whether the max - min is less than double-precision tolerance
 	
       if (d_bucketCount[numBuckets * (numBlocks - 1) + threadIdx.x] / slopes[idx] < MIN_SLOPE) {
 
@@ -579,7 +579,7 @@ namespace BucketMultiselectNew2{
 	
 	int cumulativeCount = 0;
 	for (int i = 0; i < blockIdx.x+1; i++) {
-		cumulativeCount += d_bucketCount[numBuckets * (numBlocks - 1) + i];
+          cumulativeCount += d_bucketCount[numBuckets * (numBlocks - 1) + i];
 	}
         orderStats[idx] = d_vector[cumulativeCount];
         markedBuckets[idx] = 0;
@@ -634,7 +634,7 @@ namespace BucketMultiselectNew2{
     unsigned int mainSeed;
 
     RandomNumberFunctor(unsigned int _mainSeed) :
-      mainSeed(_mainSeed) {}
+    mainSeed(_mainSeed) {}
   
     __host__ __device__
     float operator()(unsigned int threadIdx)
@@ -692,7 +692,7 @@ namespace BucketMultiselectNew2{
   */
   template <typename T>
   void generatePivots (uint * pivots, uint * pivottree, double * slopes, uint * d_list, int sizeOfVector
-, int numPivots, int sizeOfSample, int totalSmallBuckets, uint min, uint max) {
+                       , int numPivots, int sizeOfSample, int totalSmallBuckets, uint min, uint max) {
   
     float * d_randomFloats;
     uint * d_randomInts;
@@ -714,8 +714,8 @@ namespace BucketMultiselectNew2{
     pivots[0] = min;
     pivots[numPivots-1] = max;
 
-//    thrust::device_ptr<T>randoms_ptr(d_randomInts);
-//    thrust::sort(randoms_ptr, randoms_ptr + sizeOfSample);
+    //    thrust::device_ptr<T>randoms_ptr(d_randomInts);
+    //    thrust::sort(randoms_ptr, randoms_ptr + sizeOfSample);
 
     cubDeviceSort<T>(d_randomInts, sizeOfSample);
 
@@ -772,8 +772,8 @@ namespace BucketMultiselectNew2{
     pivots[0] = min;
     pivots[numPivots - 1] = max;
 
-//    thrust::device_ptr<T>randoms_ptr(d_randoms);
-//    thrust::sort(randoms_ptr, randoms_ptr + sizeOfSample);
+    //    thrust::device_ptr<T>randoms_ptr(d_randoms);
+    //    thrust::sort(randoms_ptr, randoms_ptr + sizeOfSample);
 
     cubDeviceSort<T>(d_randoms, sizeOfSample);
 
@@ -827,14 +827,14 @@ namespace BucketMultiselectNew2{
   */
   template <typename T>
   T bucketMultiSelect (T* d_vector, int length, uint * kVals, int numKs, T * output, int blocks
-              , int threads, int numBuckets, int numPivots) {    
+                       , int threads, int numBuckets, int numPivots) {    
 
     /// ***********************************************************
     /// **** STEP 1: Initialization 
     /// **** STEP 1.1: Find Min and Max of the whole vector
     /// **** We don't need to go through the rest of the algorithm if it's flat
     /// ***********************************************************
-timing(0,1);
+    timing(0,1);
 
 
 
@@ -956,12 +956,12 @@ timing(0,1);
       kOffsetMin++;
     }
 
-timing(1,1);
+    timing(1,1);
     /// ***********************************************************
     /// **** STEP 2: CreateBuckets 
     /// ****  Declare and Generate Pivots and Slopes
     /// ***********************************************************
-timing(0,2);
+    timing(0,2);
 
     CUDA_CALL(cudaMalloc(&d_slopes, numPivots * sizeof(double)));
     CUDA_CALL(cudaMalloc(&d_pivots, numPivots * sizeof(T)));
@@ -985,12 +985,12 @@ timing(0,2);
                          cudaMemcpyHostToDevice)); 
     CUDA_CALL(cudaMemcpy(d_pivottree, pivottree, numPivots* sizeof(T), 
                          cudaMemcpyHostToDevice));
-timing(1,2);
+    timing(1,2);
     /// ***********************************************************
     /// **** STEP 3: AssignBuckets 
     /// **** Using the function assignSmartBucket
     /// ***********************************************************
-timing(0,3);
+    timing(0,3);
 
     //Distribute elements into their respective buckets
     assignSmartBucket<T><<<numBlocks, threadsPerBlock, 2 * numPivots * sizeof(T) +  
@@ -999,13 +999,13 @@ timing(0,3);
        d_elementToBucket, d_bucketCount, offset, &precount);
     SAFEcuda("assignSmartBucket");
 
-timing(1,3);
+    timing(1,3);
     /// ***********************************************************
     /// **** STEP 4: IdentifyActiveBuckets 
     /// **** Find the kth buckets
     /// **** and update their respective indices
     /// ***********************************************************
-timing(0,4);
+    timing(0,4);
 
     sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount, 
                                                                numBuckets, numBlocks);
@@ -1052,13 +1052,13 @@ timing(0,4);
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
 
-timing(1,4);
+    timing(1,4);
     /// ***********************************************************
     /// **** STEP 5: Reduce 
     /// **** Copy the elements from the unique acitve buckets
     /// **** to a new vector 
     /// ***********************************************************
-timing(0,5);
+    timing(0,5);
 
     // allocate memory for the new array
     CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
@@ -1071,28 +1071,28 @@ timing(0,5);
     }
 
     copyElements_tree<T><<<numBlocks, threadsPerBlock, 
-        numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
-                                             d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
-                                             d_bucketCount, numBuckets);
+      numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
+                                           d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
+                                           d_bucketCount, numBuckets);
     SAFEcuda("copyElements");
 
 
 
-timing(1,5);
+    timing(1,5);
     /// ***********************************************************
     /// **** STEP 6: sort&choose
     /// **** Using thrust::sort on the reduced vector and the
     /// **** updated indices of the order statistics, 
     /// **** we solve the reduced problem.
     /// ***********************************************************
-timing(0,6);
+    timing(0,6);
 
 
-     // Recreate sub-buckets
+    // Recreate sub-buckets
 
     recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots 
-                                                      , d_elementToBucket, kthBucketScanner, d_bucketCount
-                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, counts, d_uniqueBuckets);
+                                                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
+                                                                                       , offset, length, numBlocks, numUniqueBuckets, &precount, counts, d_uniqueBuckets);
 
     SAFEcuda("recreateBuckets");
 
@@ -1146,9 +1146,9 @@ timing(0,6);
     }
 
     copyElements_tree_recurse<T><<<numBlocks, threadsPerBlock, 
-        numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
-                                             d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
-                                             d_bucketCount, numBuckets, numBlocks);
+      numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
+                                           d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
+                                           d_bucketCount, numBuckets, numBlocks);
     SAFEcuda("copyElements");
 
     // OLD STUFF BEGINS
@@ -1195,104 +1195,104 @@ timing(0,6);
     /// **** updated indices of the order statistics, 
     /// **** 
     /// ***********************************************************
-// timing(0,6)
+    // timing(0,6)
   
 
-//   while (newInputLength > 0) {
+    //   while (newInputLength > 0) {
 
-//     // Recreate sub-buckets
+    //     // Recreate sub-buckets
 
-//     recreateBuckets<T><<<numBlocks,threadsPerBlock>>>(d_vector, numBuckets, slopes, pivots 
-//                                                       , elementToBucket, kthBucketScanner, d_bucketCount
-//                                                       , offset, length, numBlocks, numUniqueBuckets);
-//     SAFEcuda("recreateBuckets");
+    //     recreateBuckets<T><<<numBlocks,threadsPerBlock>>>(d_vector, numBuckets, slopes, pivots 
+    //                                                       , elementToBucket, kthBucketScanner, d_bucketCount
+    //                                                       , offset, length, numBlocks, numUniqueBuckets);
+    //     SAFEcuda("recreateBuckets");
 
-//     // Identify active buckets
+    //     // Identify active buckets
 
-//     sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount, 
-//                                                                numBuckets, numBlocks);
-//     SAFEcuda("sumCounts");
+    //     sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount, 
+    //                                                                numBuckets, numBlocks);
+    //     SAFEcuda("sumCounts");
 
-//     // Mark the buckets containing relevant order statistics
-//     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
-//                  kthBucketScanner, kthBuckets, numBlocks);
-//     SAFEcuda("findKBuckets");
+    //     // Mark the buckets containing relevant order statistics
+    //     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
+    //                  kthBucketScanner, kthBuckets, numBlocks);
+    //     SAFEcuda("findKBuckets");
 
-//     // we must update K since we have reduced the problem size to elements in the 
-//     // kth bucket.
-//     //  get the index of the first element
-//     //  add the number of elements
-//     d_uniqueBuckets[0] = kthBuckets[0];
-//     d_reindexCounter[0] = 0;
-//     numUniqueBuckets = 1;
-//     kVals[0] -= kthBucketScanner[0];
+    //     // we must update K since we have reduced the problem size to elements in the 
+    //     // kth bucket.
+    //     //  get the index of the first element
+    //     //  add the number of elements
+    //     d_uniqueBuckets[0] = kthBuckets[0];
+    //     d_reindexCounter[0] = 0;
+    //     numUniqueBuckets = 1;
+    //     kVals[0] -= kthBucketScanner[0];
 
-//     for (int i = 1; i < numKs; i++) {
-//       if (kthBuckets[i] != kthBuckets[i-1]) {
-//         d_uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
-//         d_reindexCounter[numUniqueBuckets] = 
-//           d_reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
-//         numUniqueBuckets++;
-//       }
-//       kVals[i] = d_reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
-//     }
+    //     for (int i = 1; i < numKs; i++) {
+    //       if (kthBuckets[i] != kthBuckets[i-1]) {
+    //         d_uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
+    //         d_reindexCounter[numUniqueBuckets] = 
+    //           d_reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
+    //         numUniqueBuckets++;
+    //       }
+    //       kVals[i] = d_reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
+    //     }
 
-//     newInputLength = reindexCounter[numUniqueBuckets-1] 
-//       + h_bucketCount[kthBuckets[numKs - 1]];
+    //     newInputLength = reindexCounter[numUniqueBuckets-1] 
+    //       + h_bucketCount[kthBuckets[numKs - 1]];
 
-//     CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
-//                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
-//     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
-//                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+    //     CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
+    //                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+    //     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
+    //                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
 
-//     reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
-//       threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
-//                          d_uniqueBuckets, numUniqueBuckets);
-//     SAFEcuda("reindexCounts");
+    //     reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
+    //       threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
+    //                          d_uniqueBuckets, numUniqueBuckets);
+    //     SAFEcuda("reindexCounts");
 
-//     // Check whether buckets are still valid, unmark if a bucket only contains one value
+    //     // Check whether buckets are still valid, unmark if a bucket only contains one value
 
-//     checkBuckets<T><<<numBlocks,threadsPerBlock>>>(numBuckets, slopes, d_bucketCount, numBlocks, outputs
-//                                                    , d_vector, markedBuckets);
-//     SAFEcuda("checkBuckets");
+    //     checkBuckets<T><<<numBlocks,threadsPerBlock>>>(numBuckets, slopes, d_bucketCount, numBlocks, outputs
+    //                                                    , d_vector, markedBuckets);
+    //     SAFEcuda("checkBuckets");
     
-//     // Reduce problem by deleting all irrelevant buckets and duplicates
+    //     // Reduce problem by deleting all irrelevant buckets and duplicates
 
-//     CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
+    //     CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
    
-//     int numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
-//     if (numUnique_extended > numUniqueBuckets+1){
-//       numUnique_extended--;
-//     } else {
-//       numUnique_extended = (numUnique_extended << 1 ) - 1;
-//     }
+    //     int numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
+    //     if (numUnique_extended > numUniqueBuckets+1){
+    //       numUnique_extended--;
+    //     } else {
+    //       numUnique_extended = (numUnique_extended << 1 ) - 1;
+    //     }
 
-//     copyElements_tree<T><<<numBlocks, threadsPerBlock, 
-//         numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
-//                                              d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
-//                                              d_bucketCount, numBuckets);
-//     SAFEcuda("copyElements");
+    //     copyElements_tree<T><<<numBlocks, threadsPerBlock, 
+    //         numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
+    //                                              d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
+    //                                              d_bucketCount, numBuckets);
+    //     SAFEcuda("copyElements");
     
-//     // Free old vector and reassign updated vector
-//     T* temp = d_vector;
-//     d_vector = newInput;
-//     cudaFree(temp);
-//   } // end while
+    //     // Free old vector and reassign updated vector
+    //     T* temp = d_vector;
+    //     d_vector = newInput;
+    //     cudaFree(temp);
+    //   } // end while
 
-//  cudaFree(d_pivots);
-//  cudaFree(d_pivottree);
-//  cudaFree(d_slopes);  
-//  free(h_bucketCount); 
-//  cudaFree(d_bucketCount); 
-//  cudaFree(d_uniqueBuckets); 
-//  cudaFree(d_reindexCounter);  
-//  cudaFree(d_elementToBucket);  
-//  cudaFree(d_kIndices); 
-//  cudaFree(d_kVals); 
-//  cudaFree(newInput); 
-//  free(kIndices - kOffsetMin);
- timing(1,6);
- return 1;
+    //  cudaFree(d_pivots);
+    //  cudaFree(d_pivottree);
+    //  cudaFree(d_slopes);  
+    //  free(h_bucketCount); 
+    //  cudaFree(d_bucketCount); 
+    //  cudaFree(d_uniqueBuckets); 
+    //  cudaFree(d_reindexCounter);  
+    //  cudaFree(d_elementToBucket);  
+    //  cudaFree(d_kIndices); 
+    //  cudaFree(d_kVals); 
+    //  cudaFree(newInput); 
+    //  free(kIndices - kOffsetMin);
+    timing(1,6);
+    return 1;
   }
 
 
