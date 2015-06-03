@@ -1068,6 +1068,7 @@ timing(0,5);
     SAFEcuda("copyElements");
 
 
+
 timing(1,5);
     /// ***********************************************************
     /// **** STEP 6: sort&choose
@@ -1089,8 +1090,65 @@ timing(0,6);
                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
                                                      , offset, length, numBlocks, numUniqueBuckets, &precount);
 
-
     SAFEcuda("recreateBuckets");
+
+
+    findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
+                 kthBucketScanner, kthBuckets, numBlocks);
+    SAFEcuda("findKBuckets");
+
+    // we must update K since we have reduced the problem size to elements in the 
+    // kth bucket.
+    //  get the index of the first element
+    //  add the number of elements
+    uniqueBuckets[0] = kthBuckets[0];
+    reindexCounter[0] = 0;
+    numUniqueBuckets = 1;
+    kVals[0] -= kthBucketScanner[0];
+
+    for (int i = 1; i < numKs; i++) {
+      if (kthBuckets[i] != kthBuckets[i-1]) {
+        uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
+        reindexCounter[numUniqueBuckets] = 
+          reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
+        numUniqueBuckets++;
+      }
+      kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
+    }
+
+    newInputLength = reindexCounter[numUniqueBuckets-1] 
+      + h_bucketCount[kthBuckets[numKs - 1]];
+
+
+    // reindex the counts
+    CUDA_CALL(cudaMalloc(&d_reindexCounter, numUniqueBuckets * sizeof(uint)));
+    CUDA_CALL(cudaMalloc(&d_uniqueBuckets, numUniqueBuckets * sizeof(uint)));
+
+    CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
+                         numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
+                         numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+
+    reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
+      threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
+                         d_uniqueBuckets, numUniqueBuckets);
+    SAFEcuda("reindexCounts");
+
+        int numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
+    if (numUnique_extended > numUniqueBuckets+1){
+      numUnique_extended--;
+    } else {
+      numUnique_extended = (numUnique_extended << 1 ) - 1;
+    }
+
+    copyElements_tree_recurse<T><<<numBlocks, threadsPerBlock, 
+        numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
+                                             d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
+                                             d_bucketCount, numBuckets, numBlocks);
+    SAFEcuda("copyElements");
+
+    // OLD STUFF BEGINS
+
 
     sort_phase<T>(newInput, newInputLength);
     SAFEcuda("sort_phase");
