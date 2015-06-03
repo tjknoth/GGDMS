@@ -1091,14 +1091,9 @@ namespace BucketMultiselectNew2{
 
     // Recreate sub-buckets
 
-    recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots 
-<<<<<<< HEAD
+    recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots
                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
                                                      , offset, length, numBlocks, numUniqueBuckets, &precount, d_uniqueBuckets);
-=======
-                                                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
-                                                                                       , offset, length, numBlocks, numUniqueBuckets, &precount, counts, d_uniqueBuckets);
->>>>>>> 665d510f8485351895620823336af3fc7e068a67
 
     SAFEcuda("recreateBuckets");
 
