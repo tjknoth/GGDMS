@@ -414,6 +414,69 @@ namespace BucketMultiselectNew2{
 
 
 
+    template <typename T>
+  __global__ void copyElements_tree_recurse (T* d_vector, int length, uint* elementToBucket
+                                , uint * uniqueBuckets, const int numUnique, const int numUnique_extended, T* newArray, uint offset
+                                             , uint * d_bucketCount, int numTotalBuckets, int numBlocks) {
+
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int threadIndex;
+    int loop = (numUnique_extended) / MAX_THREADS_PER_BLOCK;
+    int mid = numUnique_extended / 2;
+    int blockOffset = blockIdx.x * numTotalBuckets;
+
+    extern __shared__ uint activeTree[];
+
+    int treeidx, level, shift, remainder, bucketidx;
+    // read from shared memory into a binary search tree
+    for (int i = 0; i <= loop; i++) {      
+      threadIndex = i * blockDim.x + threadIdx.x;
+      if (threadIndex < numUnique_extended) {
+        treeidx = threadIndex+1;
+        level = (int) floorf ( log2f( (float)treeidx ) );
+        shift = (1 << level);
+        remainder = treeidx - shift;
+
+        bucketidx = ((2*remainder + 1)*mid) / shift;
+        if (bucketidx < numUnique) {
+           activeTree[threadIndex] = uniqueBuckets[bucketidx];
+        } else {
+           activeTree[threadIndex] = uniqueBuckets[numUnique-1];
+        } // end if (bucketidx) {} else
+      } // end if (threadIndex)
+    }  // end for
+    
+    syncthreads();
+
+
+    int temp_bucket, temp_active, treeindex, active, searchdepth;
+
+    // binary search tree through the active buckets to see
+    // if the current element is in an active bucket.  
+    // If not, active = 0. If so, active = 1.
+    if(idx < length) {
+      for(int i=idx; i<length; i+=offset) {
+        temp_bucket = elementToBucket[i];
+        treeindex = 1;
+        active = 0;
+        searchdepth = 1;
+        while ( (active==0) && (searchdepth<numUnique_extended) ){
+          temp_active = activeTree[treeindex - 1];
+          searchdepth *= 2;
+          (temp_active == temp_bucket) ? active++ : ( treeindex = (treeindex << 1) + (temp_bucket > temp_active) );
+        }  // endwhile
+
+
+        // if this element is in an active bucket, copy it to the new input vector
+        if (active) {
+          newArray[atomicDec(d_bucketCount + temp_active + numTotalBuckets * numBlocks , length)-1] = d_vector[i];
+        }  // end if (active)
+      }  // ends for loop with offset jump
+    }  // ends if (idx < length)
+
+  }  // ends copyElements_tree kernel
+
+
   /* Function to split existing buckets into sub-buckets and allocate data accordingly
    *
    * Notes: Make sure slopes is allocated. Get endpoints.
