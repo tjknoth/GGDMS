@@ -491,11 +491,11 @@ namespace BucketMultiselectNew2{
     double slope;
     int previousBuckets;
     int numSubBuckets;
-    extern __shared__ uint * counts;
+    __shared__ uint * counts;
 
 
     // Initialize counts
-    for (int i = idx; i < numBuckets; i += numUniqueBuckets * blockDim.x) {
+    for (int i = idx; i < numBuckets; i += numBigBuckets * blockDim.x) {
       counts[i] = 0;
     } // end for
 
@@ -1013,7 +1013,7 @@ namespace BucketMultiselectNew2{
     SAFEcuda("sumCounts");
 
     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
-                 kthBucketScanner, kthBuckets, numBlocks);
+                 kthBucketScanner, kthBuckets, (int) ceil((float)numUniqueBuckets/threadsPerBlock));
     SAFEcuda("findKBuckets");
 
     // we must update K since we have reduced the problem size to elements in the 
@@ -1093,7 +1093,7 @@ namespace BucketMultiselectNew2{
 
     recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots
                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
-                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, d_uniqueBuckets);
+                                                     , offset, length, numUniqueBuckets, numUniqueBuckets, &precount, d_uniqueBuckets);
 
     SAFEcuda("recreateBuckets");
 
