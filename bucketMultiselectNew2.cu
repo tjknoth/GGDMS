@@ -484,31 +484,37 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
                                    uint * elementToBucket, uint* endpoints, uint* d_bucketCount
-                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * counts, uint * blockToBucket) {
+                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * counts, uint * d_uniqueBuckets) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-	__shared__ T min;
-	__shared__ double slope;
-	__shared__ int previousBuckets;
+	T min;
+	double slope;
+	int previousBuckets;
 	int numSubBuckets;
+	extern __shared__ uint * counts;
+
+	// Initialize counts
+	for (int i = idx; i < numBuckets; i += numUniqueBuckets * blockDim.x) {
+		counts[i] = 0;
+	} // end for
+
+	syncthreads();
 
     // One block is dedicated to each big bucket
     if (blockIdx.x < numBigBuckets) {
 
 		// One thread calculates shared values for the block
 		if (threadIdx.x < 1) {
-			// Assign one block to each bucket
-			blockToBucket[blockIdx.x] = elementToBucket[endpoints[blockIdx.x]];
 
 			// Find which of the previous buckets we are in
-			int hugeBucket = (int) (blockToBucket[blockIdx.x] / *precount);
+			int hugeBucket = (int) (d_uniqueBuckets[blockIdx.x] / *precount);
 
 			// Calculate number of subbuckets per big bucket
 			numSubBuckets = (int) (numBuckets / numBigBuckets); 
 										
 			// Calculate and store min and slope
-			min = ((elementToBucket[endpoints[blockIdx.x]] - (*precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
-			T max = ((elementToBucket[endpoints[blockIdx.x]] - (*precount * hugeBucket) + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
+			min = ((d_uniqueBuckets[blockIdx.x] - (*precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
+			T max = ((d_uniqueBuckets[blockIdx.x] - (*precount * hugeBucket) + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
 			double slope = numSubBuckets/(max - min);
 
 			// Calculate number of subbuckets for the previous big buckets
@@ -530,7 +536,8 @@ namespace BucketMultiselectNew2{
 
 	
 		// reassign bucket numbers
-		for (int i = idx + endpoints[blockIdx.x]; i < bucketEnd; i += blockDim.x) {
+		int start = endpoints[blockIdx.x];
+		for (int i = idx + start; i < bucketEnd; i += blockDim.x) {
 			int bucketIndex = (int) (slope * (d_vector[i] - min)) + previousBuckets;
 			elementToBucket[i] = bucketIndex; 
 			atomicInc(counts + bucketIndex, length);
@@ -538,6 +545,8 @@ namespace BucketMultiselectNew2{
 		originalSlopes[blockIdx.x] = slope;		
     } // end if
 	
+	syncthreads();
+
 	// copy counts to d_bucketCount	
     int sumsRowIndex= numBuckets * (numBlocks-1);
 	for (int i = 0; i < numBlocks; i++) {
@@ -1079,16 +1088,11 @@ timing(1,5);
 timing(0,6);
 
 
-	// Initialize recreateBucket arrays
-	uint * counts = (uint *) malloc (numBuckets * sizeof (uint));
-	memset(counts, 0, numBuckets * sizeof(uint));
-	uint * blockToBucket = (uint *) malloc (numUniqueBuckets * sizeof (uint));
-
      // Recreate sub-buckets
 
-    recreateBuckets<T><<<numBlocks,threadsPerBlock>>>(d_vector, numBuckets, d_slopes, d_pivots 
+    recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots 
                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
-                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, counts, blockToBucket);
+                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, counts, d_uniqueBuckets);
 
     SAFEcuda("recreateBuckets");
 
