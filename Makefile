@@ -46,9 +46,15 @@ CPUProcessData
 
 CompareMultiselect = \
 compareMultiselect.cu \
-bucketMultiselectNew.cu naiveBucketMultiselect.cu \
+bucketMultiselect.cu naiveBucketMultiselect.cu \
 bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
 generateProblems.cu multiselectTimingFunctions.cu
+
+CompareMultiselectNew2 = \
+compareMultiselectNew2.cu \
+bucketMultiselectNew2.cu naiveBucketMultiselect.cu \
+bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
+generateProblems.cu multiselectTimingFunctionsNew2.cu
 
 AnalyzeMultiselect = \
 analyzeMultiselect.cu \
@@ -104,6 +110,9 @@ compareMultiselect_working: $(CompareMultiselect_working)
 	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
 
 compareMultiselect: $(CompareMultiselect)
+	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
+
+compareMultiselectNew2: $(CompareMultiselectNew2)
 	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
 
 analyzeMultiselect: $(AnalyzeMultiselect)
