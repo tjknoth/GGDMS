@@ -484,13 +484,13 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
                                    uint * elementToBucket, uint* endpoints, uint* d_bucketCount
-                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount) {
+                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * counts, uint * blockToBucket) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
 	__shared__ T min;
 	__shared__ double slope;
 	__shared__ int previousBuckets;
-
+	int numSubBuckets;
 
     // One block is dedicated to each big bucket
     if (blockIdx.x < numBigBuckets) {
@@ -504,7 +504,7 @@ namespace BucketMultiselectNew2{
 			int hugeBucket = (int) (blockToBucket[blockIdx.x] / precount);
 
 			// Calculate number of subbuckets per big bucket
-			int numSubBuckets = (int) (numBuckets / numBigBuckets); 
+			numSubBuckets = (int) (numBuckets / numBigBuckets); 
 										
 			// Calculate and store min and slope
 			min = ((elementToBucket[endpoints[blockIdx.x]] - (precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
@@ -1088,7 +1088,7 @@ timing(0,6);
 
     recreateBuckets<T><<<numBlocks,threadsPerBlock>>>(d_vector, numBuckets, d_slopes, d_pivots 
                                                       , d_elementToBucket, kthBucketScanner, d_bucketCount
-                                                     , offset, length, numBlocks, numUniqueBuckets, &precount);
+                                                     , offset, length, numBlocks, numUniqueBuckets, &precount, counts, blockToBucket);
 
     SAFEcuda("recreateBuckets");
 
@@ -1134,7 +1134,7 @@ timing(0,6);
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
 
-        int numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
+    numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
     if (numUnique_extended > numUniqueBuckets+1){
       numUnique_extended--;
     } else {
