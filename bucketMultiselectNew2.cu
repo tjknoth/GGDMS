@@ -507,8 +507,8 @@ namespace BucketMultiselectNew2{
 			int numSubBuckets = (int) (numBuckets / numBigBuckets); 
 										
 			// Calculate and store min and slope
-			min = ((elementToBucket[endpoints[blockIdx.x]] - (precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
-			T max = ((elementToBucket[endpoints[blockIdx.x]] - (precount * hugeBucket) + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
+			min = ((elementToBucket[endpoints[blockIdx.x]] - (*precount * hugeBucket)) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
+			T max = ((elementToBucket[endpoints[blockIdx.x]] - (*precount * hugeBucket) + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
 			double slope = numSubBuckets/(max - min);
 
 			// Calculate number of subbuckets for the previous big buckets
