@@ -121,12 +121,12 @@ namespace BucketMultiselectNew2{
     // consider the last row which holds the total counts
     int sumsRowIndex= numBuckets * (numBlocks-1);
 
-	printf("\n %p \n", h_bucketCount);
-	printf("\n %p \n", d_bucketCount);
-	printf("\n %p \n", d_bucketCount + sumsRowIndex);
-	printf("\n %d \n", sumsRowIndex);
-	printf("\n %d \n", numBuckets);
-	printf("\n %d \n", numBlocks);
+    printf("\n %p \n", h_bucketCount);
+    printf("\n %p \n", d_bucketCount);
+    printf("\n %p \n", d_bucketCount + sumsRowIndex);
+    printf("\n %d \n", sumsRowIndex);
+    printf("\n %d \n", numBuckets);
+    printf("\n %d \n", numBlocks);
 
     CUDA_CALL(cudaMemcpy(h_bucketCount, d_bucketCount + sumsRowIndex, 
                          sizeof(uint) * numBuckets, cudaMemcpyDeviceToHost));
@@ -925,6 +925,7 @@ if (threadIdx.x<1) { printf("bolckId = %d, start=%d bucketEnd=%d, previousBucket
     //Allocate memory to store bucket counts
     size_t totalBucketSize = numBlocks * numBuckets * sizeof(uint);
     uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
+
     //array showing the number of elements in each bucket
     uint * d_bucketCount; 
 
@@ -1131,7 +1132,8 @@ for (int i=0; i<newInputLength; i++){   std::cout << " newInput[" << i << "]=" <
     timing(0,6);
 
 
-	precount = numBuckets/(numPivots - 1);
+
+    precount = numBuckets/(numPivots - 1);
  
     setToAllZero(d_bucketCount + numBuckets*(numBlocks-1), numBuckets);
 
@@ -1141,7 +1143,6 @@ for (int i=0; i<newInputLength; i++){   std::cout << " newInput[" << i << "]=" <
     CUDA_CALL(cudaMemcpy(d_endpoints, kthBucketScanner, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
     
-
     // Recreate sub-buckets
 
     recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(newInput, numBuckets, d_slopes, d_pivots
