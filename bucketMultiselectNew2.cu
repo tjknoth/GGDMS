@@ -495,20 +495,22 @@ namespace BucketMultiselectNew2{
   __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
                                    uint * elementToBucket, uint* endpoints, uint* d_bucketCount
                                    , uint offset, int length, int numBlocks, const int numBigBuckets, int * precount, uint * d_uniqueBuckets) {
-//    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     __shared__ T minimum;
     __shared__ double slope;
     __shared__ int previousBuckets;
     __shared__ int numSubBuckets;
-    __shared__ int start;
-    __shared__ int bucketEnd;
-
-    extern __shared__ uint counts[];
 
 
+    extern __shared__ uint array[];
+    uint* counts = (uint*) array;    
+    uint* bucketBounds = (uint*) array[numBuckets];
 
-      int sumsRowIndex= numBuckets * (numBlocks-1);
+
+    int sumsRowIndex= numBuckets * (numBlocks-1);
+    if (idx < 1) bucketBounds[numBigBuckets] = length;
+
 /*
     // Initialize counts
     for (int i = idx; i < numBuckets; i += numBigBuckets * blockDim.x) {
@@ -520,9 +522,18 @@ namespace BucketMultiselectNew2{
 
     // One block is dedicated to each big bucket
     if (blockIdx.x < numBigBuckets) {
-
+	printf("1");
       // One thread calculates shared values of slope, min and number of previous buckets for this block
       if (threadIdx.x < 1) {
+	printf("2");
+
+       if (blockIdx.x == 0){
+         bucketBounds[0] = 0;
+         } else if (blockIdx.x < numBigBuckets) {
+	   bucketBounds[blockIdx.x] = bucketBounds[blockIdx.x-1] + d_bucketCount[d_uniqueBuckets[blockIdx.x] + sumsRowIndex];
+       } // end if-else
+
+	 
 
         // Find which of the previous buckets we are in
         int hugeBucket = (int) (d_uniqueBuckets[blockIdx.x] / *precount);
@@ -538,13 +549,30 @@ namespace BucketMultiselectNew2{
         // Calculate number of subbuckets for the previous big buckets
         previousBuckets = (int) numSubBuckets * blockIdx.x;
 
+	printf("endpoints 0 = %u \n",bucketBounds[0]);
+	printf("endpoints 1 = %u \n",bucketBounds[1]);
+	printf("endpoints 2 = %u \n",bucketBounds[2]);
+
         // determine the indices of the ends of the bucket on which this block is working
-        if (blockIdx.x < numBigBuckets - 1){
-          bucketEnd = endpoints[blockIdx.x + 1];
-        } else {
-          bucketEnd = length;
-        } // end if-else
-        start = endpoints[blockIdx.x];
+//        if (blockIdx.x < numBigBuckets - 1){
+//          bucketEnd = endpoints[blockIdx.x + 1];
+//        } else {
+//          bucketEnd = length;
+//        } // end if-else
+//        start = endpoints[blockIdx.x];
+
+
+
+
+        // determine the indices of the ends of the bucket on which this block is working
+//        if (blockIdx.x == 0){
+//	  start = 0;
+//	  bucketEnd = start + d_bucketCount[d_uniqueBuckets[blockIdx.x] + sumsRowIndex];
+  //      } else if (blockIdx.x < numBigBuckets) {
+	//  start = d_bucketCount[d_uniqueBuckets[blockIdx.x] + sumsRowIndex];
+	  //bucketEnd = start + d_bucketCount[d_uniqueBuckets[blockIdx.x] + sumsRowIndex];
+        //} // end if-else
+        //start = endpoints[blockIdx.x];
 
 
 //        precount[0] = numSubBuckets;	// wont work precount is on the host
@@ -573,8 +601,8 @@ namespace BucketMultiselectNew2{
 	
       // reassign bucket numbers
 
-if (threadIdx.x<1) { printf("bolckId = %d, start=%d bucketEnd=%d, previousBuckets=%d\n",blockIdx.x,start,bucketEnd, previousBuckets); } 
-      for (int i = threadIdx.x + start; i < bucketEnd; i += blockDim.x) {
+if (threadIdx.x<1) { printf("blockId = %d, start=%u bucketEnd=%u, previousBuckets=%d\n",blockIdx.x,bucketBounds[blockIdx.x],bucketBounds[blockIdx.x+1], previousBuckets);}
+      for (int i = threadIdx.x + bucketBounds[blockIdx.x]; i < bucketBounds[blockIdx.x + 1]; i += blockDim.x) {
         int bucketIndex = (int) (slope * (d_vector[i] - minimum)) + previousBuckets;
         elementToBucket[i] = bucketIndex; 
         if (blockIdx.x<1) { printf("bucketIndex=%u and elementToBucket[%d]=%u\n",bucketIndex,i,elementToBucket[i]); } 
@@ -1145,7 +1173,7 @@ for (int i=0; i<newInputLength; i++){   std::cout << " newInput[" << i << "]=" <
     
     // Recreate sub-buckets
 
-    recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(newInput, numBuckets, d_slopes, d_pivots
+    recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * (numBuckets + numUniqueBuckets + 1)>>>(newInput, numBuckets, d_slopes, d_pivots
                                                       , d_elementToBucket, d_endpoints, d_bucketCount
                                                      , offset, newInputLength, numUniqueBuckets, numUniqueBuckets, &precount, d_uniqueBuckets);
 
