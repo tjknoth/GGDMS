@@ -898,6 +898,7 @@ namespace BucketMultiselectNew2{
     //Allocate memory to store bucket counts
     size_t totalBucketSize = numBlocks * numBuckets * sizeof(uint);
     uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
+    uint * h_bucketCount2 = (uint *) malloc (numBuckets * sizeof (uint));
     //array showing the number of elements in each bucket
     uint * d_bucketCount; 
 
@@ -1109,7 +1110,7 @@ namespace BucketMultiselectNew2{
 
     SAFEcuda("recreateBuckets");
     
-    findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
+    findKBuckets(d_bucketCount, h_bucketCount2, numBuckets, kVals, numKs, 
                  kthBucketScanner, kthBuckets, numBlocks);
     SAFEcuda("findKBuckets");
 
@@ -1126,14 +1127,14 @@ namespace BucketMultiselectNew2{
       if (kthBuckets[i] != kthBuckets[i-1]) {
         uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
         reindexCounter[numUniqueBuckets] = 
-          reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
+          reindexCounter[numUniqueBuckets-1]  + h_bucketCount2[kthBuckets[i-1]];
         numUniqueBuckets++;
       }
       kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
     }
 
     newInputLength = reindexCounter[numUniqueBuckets-1] 
-      + h_bucketCount[kthBuckets[numKs - 1]];
+      + h_bucketCount2[kthBuckets[numKs - 1]];
 
 
     // reindex the counts
@@ -1144,12 +1145,12 @@ namespace BucketMultiselectNew2{
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
-
+	printf("\n %d \n", numUniqueBuckets);
     reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
       threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
-
+	printf("\n %d \n", numUniqueBuckets);
     numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
     if (numUnique_extended > numUniqueBuckets+1){
       numUnique_extended--;
@@ -1190,7 +1191,8 @@ namespace BucketMultiselectNew2{
     cudaFree(d_pivots);
     cudaFree(d_pivottree);
     cudaFree(d_slopes);  
-    free(h_bucketCount); 
+    free(h_bucketCount);
+    free(h_bucketCount2); 
     cudaFree(d_bucketCount); 
     cudaFree(d_uniqueBuckets); 
     cudaFree(d_reindexCounter);  
