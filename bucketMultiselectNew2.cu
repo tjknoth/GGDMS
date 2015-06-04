@@ -898,7 +898,7 @@ namespace BucketMultiselectNew2{
     //Allocate memory to store bucket counts
     size_t totalBucketSize = numBlocks * numBuckets * sizeof(uint);
     uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
-    uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
+
     //array showing the number of elements in each bucket
     uint * d_bucketCount; 
 
@@ -1192,7 +1192,6 @@ namespace BucketMultiselectNew2{
     cudaFree(d_pivottree);
     cudaFree(d_slopes);  
     free(h_bucketCount);
-    free(h_bucketCount); 
     cudaFree(d_bucketCount); 
     cudaFree(d_uniqueBuckets); 
     cudaFree(d_reindexCounter);  
