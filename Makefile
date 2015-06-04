@@ -19,6 +19,7 @@ CDP = -DCUB_CDP
 
 # Common flags
  COMMONFLAGS += $(INCLUDES)
+ COMMONFLAGS += -g
 # Compilers
 NVCCFLAGS += $(COMMONFLAGS)
 NVCCFLAGS += $(ARCH)
@@ -31,7 +32,8 @@ CFLAGS += $(COMMONFLAGS)
 PROGRAMS = \
 compareMultiselect \
 analyzeMultiselect \
-realDataTests 
+realDataTests \
+compareMultiselectNew2
 
 SMOS = \
 SMOStimingsOSDistrAll \
