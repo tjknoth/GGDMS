@@ -1,0 +1,19 @@
+16777216,3,UNIFORM FLOATS,Uniform Random Ks,Sort and Choose Multiselect,16.1167,Bucket Multiselect,10.4206,Bucket MultiselectNew2,0,
+ERROR ON TEST 0 of 1 tests!!!!!
+vector size = 16777216
+vector seed = 1116070820764608
+numKs = 3
+wrong k = 16544612 kIndex = 0 wrong result = 1.62467e-38 correct result = 0.0138477
+
+ERROR ON TEST 0 of 1 tests!!!!!
+vector size = 16777216
+vector seed = 1116070820764608
+numKs = 3
+wrong k = 4030793 kIndex = 1 wrong result = 0 correct result = 0.759662
+
+ERROR ON TEST 0 of 1 tests!!!!!
+vector size = 16777216
+vector seed = 1116070820764608
+numKs = 3
+wrong k = 5358949 kIndex = 2 wrong result = 0 correct result = 0.680439
+3

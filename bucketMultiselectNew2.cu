@@ -35,7 +35,7 @@ namespace BucketMultiselectNew2{
 #define CUTOFF_POINT 200000 
 #define TIMING_ON
 #define MIN_SLOPE 2 ^ -1022
-  //#define SAFE
+#define SAFE
 
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) {      \
       printf("Error at %s:%d\n",__FILE__,__LINE__);     \
@@ -121,6 +121,13 @@ namespace BucketMultiselectNew2{
     // consider the last row which holds the total counts
     int sumsRowIndex= numBuckets * (numBlocks-1);
 
+	printf("\n %p \n", h_bucketCount);
+	printf("\n %p \n", d_bucketCount);
+	printf("\n %p \n", d_bucketCount + sumsRowIndex);
+	printf("\n %d \n", sumsRowIndex);
+	printf("\n %d \n", numBuckets);
+	printf("\n %d \n", numBlocks);
+
     CUDA_CALL(cudaMemcpy(h_bucketCount, d_bucketCount + sumsRowIndex, 
                          sizeof(uint) * numBuckets, cudaMemcpyDeviceToHost));
 
@@ -133,9 +140,12 @@ namespace BucketMultiselectNew2{
       while ((sum < k) & (kBucket < numBuckets - 1)) {
         kBucket++;
         sum += h_bucketCount[kBucket];
+
       }
       markedBuckets[i] = kBucket;
+
       sums[i] = sum - h_bucketCount[kBucket];
+
     }
 
     return 0;
@@ -175,7 +185,7 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void assignSmartBucket (T * d_vector, int length, int numBuckets
                                      , double * slopes, T * pivots, T * pivottree, int numPivots
-                                     , uint* d_elementToBucket , uint* d_bucketCount, int offset, int* precount) {
+                                     , uint* d_elementToBucket , uint* d_bucketCount, int offset) {
   
     int index = blockDim.x * blockIdx.x + threadIdx.x;
     uint bucketIndex;
@@ -244,7 +254,7 @@ namespace BucketMultiselectNew2{
         *(d_bucketCount + blockIdx.x * numBuckets 
           + i * MAX_THREADS_PER_BLOCK + threadIndex) = 
           *(sharedBuckets + i * MAX_THREADS_PER_BLOCK + threadIndex);
-    *precount = sharedNumSmallBuckets;
+ //   *precount = sharedNumSmallBuckets;
   }
 
 
@@ -484,7 +494,7 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
                                    uint * elementToBucket, uint* endpoints, uint* d_bucketCount
-                                   , uint offset, int length, int numBlocks, int numBigBuckets, int * precount, uint * d_uniqueBuckets) {
+                                   , uint offset, int length, int numBlocks, const int numBigBuckets, int * precount, uint * d_uniqueBuckets) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     T min;
@@ -997,7 +1007,7 @@ namespace BucketMultiselectNew2{
     assignSmartBucket<T><<<numBlocks, threadsPerBlock, 2 * numPivots * sizeof(T) +  
       + numPivots * sizeof(double) + numBuckets * sizeof(uint)>>>
       (d_vector, length, numBuckets, d_slopes, d_pivots, d_pivottree, numPivots, 
-       d_elementToBucket, d_bucketCount, offset, &precount);
+       d_elementToBucket, d_bucketCount, offset);
     SAFEcuda("assignSmartBucket");
 
     timing(1,3);
@@ -1013,7 +1023,7 @@ namespace BucketMultiselectNew2{
     SAFEcuda("sumCounts");
 
     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
-                 kthBucketScanner, kthBuckets, (int) ceil((float)numUniqueBuckets/threadsPerBlock));
+                 kthBucketScanner, kthBuckets, numBlocks);
     SAFEcuda("findKBuckets");
 
     // we must update K since we have reduced the problem size to elements in the 
@@ -1089,6 +1099,8 @@ namespace BucketMultiselectNew2{
     timing(0,6);
 
 
+	precount = numBuckets/(numPivots - 1);
+
     // Recreate sub-buckets
 
     recreateBuckets<T><<<numUniqueBuckets,threadsPerBlock,sizeof(uint) * numBuckets>>>(d_vector, numBuckets, d_slopes, d_pivots
@@ -1096,8 +1108,7 @@ namespace BucketMultiselectNew2{
                                                      , offset, length, numUniqueBuckets, numUniqueBuckets, &precount, d_uniqueBuckets);
 
     SAFEcuda("recreateBuckets");
-
-
+    
     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
                  kthBucketScanner, kthBuckets, numBlocks);
     SAFEcuda("findKBuckets");
@@ -1303,7 +1314,7 @@ namespace BucketMultiselectNew2{
   T bucketMultiselectWrapper (T * d_vector, int length, uint * kVals_ori, int numKs
                               , T * outputs, int blocks, int threads) { 
 
-    int numBuckets = 11264;
+    int numBuckets = 8192;
     uint kVals[numKs];
 
     // turn it into kth smallest
