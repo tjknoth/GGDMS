@@ -121,12 +121,12 @@ namespace BucketMultiselectNew2{
     // consider the last row which holds the total counts
     int sumsRowIndex= numBuckets * (numBlocks-1);
 
-	printf("\n %p \n", h_bucketCount);
-	printf("\n %p \n", d_bucketCount);
-	printf("\n %p \n", d_bucketCount + sumsRowIndex);
-	printf("\n %d \n", sumsRowIndex);
-	printf("\n %d \n", numBuckets);
-	printf("\n %d \n", numBlocks);
+    printf("\n %p \n", h_bucketCount);
+    printf("\n %p \n", d_bucketCount);
+    printf("\n %p \n", d_bucketCount + sumsRowIndex);
+    printf("\n %d \n", sumsRowIndex);
+    printf("\n %d \n", numBuckets);
+    printf("\n %d \n", numBlocks);
 
     CUDA_CALL(cudaMemcpy(h_bucketCount, d_bucketCount + sumsRowIndex, 
                          sizeof(uint) * numBuckets, cudaMemcpyDeviceToHost));
@@ -898,7 +898,7 @@ namespace BucketMultiselectNew2{
     //Allocate memory to store bucket counts
     size_t totalBucketSize = numBlocks * numBuckets * sizeof(uint);
     uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
-    uint * h_bucketCount2 = (uint *) malloc (numBuckets * sizeof (uint));
+    uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
     //array showing the number of elements in each bucket
     uint * d_bucketCount; 
 
@@ -1100,7 +1100,7 @@ namespace BucketMultiselectNew2{
     timing(0,6);
 
 
-	precount = numBuckets/(numPivots - 1);
+    precount = numBuckets/(numPivots - 1);
 
     // Recreate sub-buckets
 
@@ -1110,7 +1110,7 @@ namespace BucketMultiselectNew2{
 
     SAFEcuda("recreateBuckets");
     
-    findKBuckets(d_bucketCount, h_bucketCount2, numBuckets, kVals, numKs, 
+    findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
                  kthBucketScanner, kthBuckets, numBlocks);
     SAFEcuda("findKBuckets");
 
@@ -1127,14 +1127,14 @@ namespace BucketMultiselectNew2{
       if (kthBuckets[i] != kthBuckets[i-1]) {
         uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
         reindexCounter[numUniqueBuckets] = 
-          reindexCounter[numUniqueBuckets-1]  + h_bucketCount2[kthBuckets[i-1]];
+          reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
         numUniqueBuckets++;
       }
       kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
     }
 
     newInputLength = reindexCounter[numUniqueBuckets-1] 
-      + h_bucketCount2[kthBuckets[numKs - 1]];
+      + h_bucketCount[kthBuckets[numKs - 1]];
 
 
     // reindex the counts
@@ -1192,7 +1192,7 @@ namespace BucketMultiselectNew2{
     cudaFree(d_pivottree);
     cudaFree(d_slopes);  
     free(h_bucketCount);
-    free(h_bucketCount2); 
+    free(h_bucketCount); 
     cudaFree(d_bucketCount); 
     cudaFree(d_uniqueBuckets); 
     cudaFree(d_reindexCounter);  
