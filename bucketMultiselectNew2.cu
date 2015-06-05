@@ -433,7 +433,7 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void copyElements_tree_recurse (T* d_vector, int length, uint* elementToBucket
                                              , uint * uniqueBuckets, T* newArray, int numBlocks
-                                             , uint * d_bucketCount, int numTotalBuckets) {
+                                             , uint * d_bucketCount, int numBuckets, int * blockBounds) {
     
     // UPDATE PARAMS
 
@@ -441,11 +441,12 @@ namespace BucketMultiselectNew2{
     int threadIndex;
     int blockStart = blockBounds[blockIdx.x];
     int blockEnd = blockBounds[blockIdx.x + 1] - 1;
-    int sumsRowIndex= numBuckets * (numBlocks-1)
-    __shared__ int numUniqueBlock = blockEnd - blockStart;
+    int sumsRowIndex= numBuckets * (numBlocks-1);
+    __shared__ int numUniqueBlock;
+    numUniqueBlock = blockEnd - blockStart;
 
-    int mid = numUnique_extended / 2;
-    __shared__ int numUniqueExtended;
+
+    __shared__ int numUnique_extended;
     //    int blockOffset = blockIdx.x * numTotalBuckets;
 
     extern __shared__ uint activeTree[];
@@ -458,7 +459,7 @@ namespace BucketMultiselectNew2{
         numUnique_extended = (numUnique_extended << 1 ) - 1;
       }
     }
-
+    int mid = numUnique_extended / 2;
     int loop = (numUnique_extended) / MAX_THREADS_PER_BLOCK;
 
     syncthreads();
@@ -476,10 +477,10 @@ namespace BucketMultiselectNew2{
         remainder = treeidx - shift;
 
         bucketidx = ((2*remainder + 1)*mid) / shift;
-        if (bucketidx < numUnique) {
+        if (bucketidx < numUnique_extended) {
           activeTree[threadIndex] = uniqueBuckets[bucketidx];
         } else {
-          activeTree[threadIndex] = uniqueBuckets[numUnique-1];
+          activeTree[threadIndex] = uniqueBuckets[numUnique_extended-1];
         } // end if (bucketidx) {} else
       } // end if (threadIndex)
     }  // end for
@@ -487,15 +488,14 @@ namespace BucketMultiselectNew2{
     syncthreads();
 
 
-    int temp_bucket, temp_active, treeindex, active, searchdepth;
+    int temp_bucket, temp_active, treeindex, active, searchdepth, end, start;
 
     if (numUniqueBlock > 0) {
-      int start = threadIdx.x + d_bucketCount[d_uniqueBuckets[blockIdx.x] + sumsRowIndex];
+      start = threadIdx.x + d_bucketCount[uniqueBuckets[blockIdx.x] + sumsRowIndex];
       // Need special case for last bucket?
-      if (blockIdx.x < numBlocks]
-        int end = d_bucketCount[d_uniqueBuckets[blockIdx.x + 1] + sumsRowIndex];
+      if (blockIdx.x < numBlocks)
+        end = d_bucketCount[uniqueBuckets[blockIdx.x + 1] + sumsRowIndex];
       else end = length;
-      int offset = ;
       for (int i = start; i < end; i += blockDim.x) {
         temp_bucket = elementToBucket[i];
         treeindex = 1;
@@ -509,7 +509,7 @@ namespace BucketMultiselectNew2{
 
         if (active) {
           // MAKE SURE INDEX IS RIGHT
-          newArray[atomicDec(d_bucketCount + tempActive + numTotalBuckets * numBlocks, length) - 1] = d_vector[i];
+          newArray[atomicDec(d_bucketCount + temp_active + numBuckets * numBlocks, length) - 1] = d_vector[i];
         } //end if (active)
       } //end for  
     } // end if (numUniqueBlock > 0)
@@ -1284,9 +1284,9 @@ namespace BucketMultiselectNew2{
     printf("\n %d \n", numUniqueBuckets);
 
 
-    int numSubBuckets = (int) numBuckets / numBigBuckets;
+    int numSubBuckets = (int) numBuckets / numUniqueBuckets;
     // Vector to keep track of which unique buckets were created by a given block
-    uint* blockBounds = (uint*) malloc(numUniqueBuckets * sizeof(uint));
+    int* blockBounds = (int*) malloc(numUniqueBuckets * sizeof(int));
     
     // Create this vector by iterating through uniqueBuckets, finding boundaries of buckets
     //   created by each block.
@@ -1302,8 +1302,7 @@ namespace BucketMultiselectNew2{
 
     copyElements_tree_recurse<T><<<numBlocks, threadsPerBlock, 
       2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
-                                           d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
-                                           d_bucketCount, numBuckets, numBlocks);
+                                           d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets, blockBounds);
     SAFEcuda("copyElements");
 
     // OLD STUFF BEGINS
