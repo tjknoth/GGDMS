@@ -426,17 +426,39 @@ namespace BucketMultiselectNew2{
 
   template <typename T>
   __global__ void copyElements_tree_recurse (T* d_vector, int length, uint* elementToBucket
-                                             , uint * uniqueBuckets, const int numUnique, const int numUnique_extended, T* newArray, uint offset
-                                             , uint * d_bucketCount, int numTotalBuckets, int numBlocks) {
+                                             , uint * uniqueBuckets, T* newArray, int numBlocks
+                                             , uint * d_bucketCount, int numTotalBuckets) {
+    
+    // UPDATE PARAMS
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int threadIndex;
-    int loop = (numUnique_extended) / MAX_THREADS_PER_BLOCK;
+    int blockStart = blockBounds[blockIdx.x];
+    int blockEnd = blockBounds[blockIdx.x + 1] - 1;
+    int sumsRowIndex= numBuckets * (numBlocks-1)
+    __shared__ int numUniqueBlock = blockEnd - blockStart;
+
     int mid = numUnique_extended / 2;
+    __shared__ int numUniqueExtended;
     //    int blockOffset = blockIdx.x * numTotalBuckets;
 
     extern __shared__ uint activeTree[];
 
+    if (threadIdx.x < 1) {
+      numUnique_extended = ( 2 << (int)( floor( log2( (float) numUniqueBlock ) ) ) );
+      if (numUnique_extended > numUniqueBlock + 1){
+        numUnique_extended--;
+      } else {
+        numUnique_extended = (numUnique_extended << 1 ) - 1;
+      }
+    }
+
+    int loop = (numUnique_extended) / MAX_THREADS_PER_BLOCK;
+
+    syncthreads();
+
+
+    // CAN THIS BE THE SAME WITH DIFFERENT LOOP?
     int treeidx, level, shift, remainder, bucketidx;
     // read from shared memory into a binary search tree
     for (int i = 0; i <= loop; i++) {      
@@ -461,11 +483,14 @@ namespace BucketMultiselectNew2{
 
     int temp_bucket, temp_active, treeindex, active, searchdepth;
 
-    // binary search tree through the active buckets to see
-    // if the current element is in an active bucket.  
-    // If not, active = 0. If so, active = 1.
-    if(idx < length) {
-      for(int i=idx; i<length; i+=offset) {
+    if (numUniqueBlock > 0) {
+      int start = threadIdx.x + d_bucketCount[d_uniqueBuckets[blockIdx.x] + sumsRowIndex];
+      // Need special case for last bucket?
+      if (blockIdx.x < numBlocks]
+        int end = d_bucketCount[d_uniqueBuckets[blockIdx.x + 1] + sumsRowIndex];
+      else end = length;
+      int offset = ;
+      for (int i = start; i < end; i += blockDim.x) {
         temp_bucket = elementToBucket[i];
         treeindex = 1;
         active = 0;
@@ -476,13 +501,12 @@ namespace BucketMultiselectNew2{
           (temp_active == temp_bucket) ? active++ : ( treeindex = (treeindex << 1) + (temp_bucket > temp_active) );
         }  // endwhile
 
-
-        // if this element is in an active bucket, copy it to the new input vector
         if (active) {
-          newArray[atomicDec(d_bucketCount + temp_active + numTotalBuckets * numBlocks , length)-1] = d_vector[i];
-        }  // end if (active)
-      }  // ends for loop with offset jump
-    }  // ends if (idx < length)
+          // MAKE SURE INDEX IS RIGHT
+          newArray[atomicDec(d_bucketCount + tempActive + numTotalBuckets * numBlocks, length) - 1] = d_vector[i];
+        } //end if (active)
+      } //end for  
+    } // end if (numUniqueBlock > 0)
 
   }  // ends copyElements_tree kernel
 
@@ -1233,6 +1257,21 @@ namespace BucketMultiselectNew2{
       numUnique_extended--;
     } else {
       numUnique_extended = (numUnique_extended << 1 ) - 1;
+    }
+
+
+    int numSubBuckets = (int) numBuckets / numBigBuckets;
+    // Vector to keep track of which unique buckets were created by a given block
+    uint* blockBounds = (uint*) malloc(numUniqueBuckets * sizeof(uint));
+    
+    // Create this vector by iterating through uniqueBuckets, finding boundaries of buckets
+    //   created by each block.
+    int j = 0;
+    for (int i = 0; i < numUniqueBuckets; i++) {
+      if (uniqueBuckets[i] > j * numSubBuckets) {
+        blockBounds[j] = i;
+        j++;
+      } 
     }
 
     copyElements_tree_recurse<T><<<numBlocks, threadsPerBlock, 
