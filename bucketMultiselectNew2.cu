@@ -1016,6 +1016,8 @@ namespace BucketMultiselectNew2{
     // variable to store the end result
     int newInputLength;
     T* newInput;
+    T* newInputAlt;
+
 
     /// ***********************************************************
     /// **** STEP 1: Initialization 
@@ -1252,12 +1254,6 @@ namespace BucketMultiselectNew2{
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
     printf("\n %d \n", numUniqueBuckets);
-    numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
-    if (numUnique_extended > numUniqueBuckets+1){
-      numUnique_extended--;
-    } else {
-      numUnique_extended = (numUnique_extended << 1 ) - 1;
-    }
 
 
     int numSubBuckets = (int) numBuckets / numBigBuckets;
@@ -1274,8 +1270,10 @@ namespace BucketMultiselectNew2{
       } 
     }
 
+    CUDA_CALL (cudaMalloc (&newInputAlt, sizeof(T) * newInputLength));
+
     copyElements_tree_recurse<T><<<numBlocks, threadsPerBlock, 
-      numUnique_extended * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
+      2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
                                            d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
                                            d_bucketCount, numBuckets, numBlocks);
     SAFEcuda("copyElements");
