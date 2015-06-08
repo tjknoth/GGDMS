@@ -437,7 +437,6 @@ namespace BucketMultiselectNew2{
     
     // UPDATE PARAMS
 
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int threadIndex;
     int blockStart = blockBounds[blockIdx.x];
     int blockEnd = blockBounds[blockIdx.x + 1] - 1;
@@ -526,7 +525,6 @@ namespace BucketMultiselectNew2{
                                    uint * elementToBucket, uint* d_bucketCount
                                    , uint offset, int length, int numBlocks, const int numBigBuckets, int precount
                                    , uint * d_uniqueBuckets, uint* bucketBounds) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     __shared__ T minimum;
     __shared__ double slope;
@@ -666,8 +664,6 @@ namespace BucketMultiselectNew2{
         atomicAdd(d_bucketCount + i + sumsRowIndex, counts[i]);
       }
     } // end if (blockIdx.x < numBigBuckets)
-    if (idx < 1)    
-      printf ("leaving\n");
   } // end kernel
 
 
@@ -1295,11 +1291,13 @@ namespace BucketMultiselectNew2{
       if (uniqueBuckets[i] > j * numSubBuckets) {
         blockBounds[j] = i;
         j++;
+	printf("j %d\n",j);
       } 
+	printf("i %d\n",i);
     }
-
+	printf("test");
     CUDA_CALL (cudaMalloc (&newInputAlt, sizeof(T) * newInputLength));
-
+	printf("\n blocks %d \n",numBlocks);
     copyElements_tree_recurse<T><<<numBlocks, threadsPerBlock, 
       2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
                                            d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets, blockBounds);
