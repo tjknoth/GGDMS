@@ -498,17 +498,20 @@ namespace BucketMultiselectNew2{
     int temp_bucket, temp_active, treeindex, active, searchdepth, end, start;
 
     if (numUniqueBlock > 0) {
+      printf ("13\n");
       start = threadIdx.x + d_bucketCount[uniqueBuckets[blockIdx.x] + sumsRowIndex];
       // Need special case for last bucket?
       if (blockIdx.x < numBlocks)
         end = d_bucketCount[uniqueBuckets[blockIdx.x + 1] + sumsRowIndex];
       else end = length;
+      printf ("14\n");
       for (int i = start; i < end; i += blockDim.x) {
         temp_bucket = elementToBucket[i];
         treeindex = 1;
         active = 0;
         searchdepth = 1;
         while ( (active==0) && (searchdepth<numUnique_extended) ){
+          printf ("15\n");
           temp_active = activeTree[treeindex - 1];
           searchdepth *= 2;
           (temp_active == temp_bucket) ? active++ : ( treeindex = (treeindex << 1) + (temp_bucket > temp_active) );
