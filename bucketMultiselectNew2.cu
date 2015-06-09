@@ -424,93 +424,57 @@ namespace BucketMultiselectNew2{
 
 
   template <typename T>
-  __global__ void copyElements_tree_recurse (T* d_vector, int length, uint* elementToBucket
+  __global__ void copyElements_recurse (T* d_vector, int length, uint* elementToBucket
                                              , uint * uniqueBuckets, T* newArray, int numBlocks
                                              , uint * d_bucketCount, int numBuckets, int* blockBounds) {
 
     
-    
-    // UPDATE PARAMS
+    // OLD BST VERSION IS IN /MAP/testFile.cu
 
-    int threadIndex;
     int blockStart = blockBounds[blockIdx.x];
     int blockEnd = blockBounds[blockIdx.x + 1] - 1;
-    int sumsRowIndex= numBuckets * (numBlocks-1);
     __shared__ int numUniqueBlock;
-    numUniqueBlock = blockEnd - blockStart;
+    numUniqueBlock = blockEnd - blockStart + 1;
 
-
-    __shared__ int numUnique_extended;
-    //    int blockOffset = blockIdx.x * numTotalBuckets;
-
-    extern __shared__ uint activeTree[];
-
-
-    if (threadIdx.x < 1) {
-      printf ("we are doing something\n");
-      numUnique_extended = ( 2 << (int)( floor( log2( (float) numUniqueBlock ) ) ) );
-      if (numUnique_extended > numUniqueBlock + 1){
-        numUnique_extended--;
-      } else {
-        numUnique_extended = (numUnique_extended << 1 ) - 1;
+    extern __shared__ uint sharedBuckets[];
+  
+    // Read relevant unique buckets for a given block into shared memory
+    if (threadIdx.x < numUniqueBlock)
+      for (int i = 0; i < numUniqueBlock; i += blockDim.x) {
+        sharedBuckets[i + threadIdx.x] = uniqueBuckets[i + threadIdx.x + blockStart];
       }
-    }
-    int mid = numUnique_extended / 2;
-    int loop = (numUnique_extended) / MAX_THREADS_PER_BLOCK;
 
-    syncthreads();
+    syncthreads ();
 
-
-    // CAN THIS BE THE SAME WITH DIFFERENT LOOP?
-    int treeidx, level, shift, remainder, bucketidx;
-    // read from shared memory into a binary search tree
-    for (int i = 0; i <= loop; i++) {      
-      threadIndex = i * blockDim.x + threadIdx.x;
-      if (threadIndex < numUnique_extended) {
-        treeidx = threadIndex+1;
-        level = (int) floorf ( log2f( (float)treeidx ) );
-        shift = (1 << level);
-        remainder = treeidx - shift;
-
-        bucketidx = ((2*remainder + 1)*mid) / shift;
-        if (bucketidx < numUnique_extended) {
-          activeTree[threadIndex] = uniqueBuckets[bucketidx];
-        } else {
-          activeTree[threadIndex] = uniqueBuckets[numUnique_extended-1];
-        } // end if (bucketidx) {} else
-      } // end if (threadIndex)
-    }  // end for
-    
-    syncthreads();
-    
-    int temp_bucket, temp_active, treeindex, active, searchdepth, end, start;
-
-    if (numUniqueBlock > 0) {
-
-      start = threadIdx.x + d_bucketCount[uniqueBuckets[blockIdx.x] + sumsRowIndex];
-      // Need special case for last bucket?
-      if (blockIdx.x < numBlocks)
-        end = d_bucketCount[uniqueBuckets[blockIdx.x + 1] + sumsRowIndex];
-      else end = length;
-      printf ("14\n");
-      for (int i = start; i < end; i += blockDim.x) {
-        temp_bucket = elementToBucket[i];
-        treeindex = 1;
-        active = 0;
-        searchdepth = 1;
-        while ( (active==0) && (searchdepth<numUnique_extended) ){
-          printf ("15\n");
-          temp_active = activeTree[treeindex - 1];
-          searchdepth *= 2;
-          (temp_active == temp_bucket) ? active++ : ( treeindex = (treeindex << 1) + (temp_bucket > temp_active) );
-        }  // endwhile
-        printf ("fuck");
-        if (active) {
-          // MAKE SURE INDEX IS RIGHT
-          newArray[atomicDec(d_bucketCount + temp_active + numBuckets * numBlocks, length) - 1] = d_vector[i];
-        } //end if (active)
-      } //end for  
-    } // end if (numUniqueBlock > 0)
+    int idx = threadIdx.x;
+    int temp, min, max, mid, compare;
+  
+    // For each element, binary search through active buckets to see if the element is relevant.
+    //  If it's in an active bucket, copy to a new array.
+    if (idx < length) {
+      for (int i = idx; i < length; i += blockDim.x) {
+        temp = elementToBucket[i];
+        min = blockStart;
+        max = blockEnd;
+        compare = 0;
+      
+        // Binary search
+        for (int j = 1; j <= numUniqueBlock; j *= 2) {
+          mid = (max + min) / 2;
+          compare = temp > sharedBuckets[mid];
+          min = compare ? mid : min;
+          max = compare ? max : mid;
+        } //end for
+           
+        if (uniqueBuckets[max] == temp) {
+          //printf ("index = %d, max = %d\n", i, uniqueBuckets[max]);
+          //int k = atomicDec(d_bucketCount + temp + sumsRowIndex, newLength) - 1;
+          newArray[atomicDec(d_bucketCount + temp + sumsRowIndex, newLength) - 1] = d_vector[i];
+          //newArray[k] = d_vector[i];
+          //printf ("index = %d, val = %f, block = %d\n", k, newArray[k], blockIdx.x);
+        } // end if (uniqueBuckets[max] == temp)
+      } //end for
+    } // end if (idx < length)
 
   }  // ends copyElements_tree kernel
 
@@ -1239,7 +1203,7 @@ namespace BucketMultiselectNew2{
     cudaDeviceSynchronize();
 timing(1,6);
 
-/*    
+ 
     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
                  kthBucketScanner, kthBuckets, numBlocks);
     SAFEcuda("findKBuckets");
@@ -1308,7 +1272,7 @@ timing(1,6);
     CUDA_CALL(cudaMalloc (&newInputAlt, sizeof(T) * newInputLength));
     cudaThreadSynchronize();
 
-    copyElements_tree_recurse<T><<<numUniqueBuckets, threadsPerBlock,
+    copyElements_recurse<T><<<numUniqueBuckets, threadsPerBlock,
       2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
                                   d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets, d_blockBounds);
 
@@ -1317,7 +1281,6 @@ timing(1,6);
     SAFEcuda("copyElements");
 
     // OLD STUFF BEGINS
-*/
 
 timing(0,7);
     for (int i = 0; i < 3;i++)
