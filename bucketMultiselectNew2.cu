@@ -454,6 +454,7 @@ namespace BucketMultiselectNew2{
     //  If it's in an active bucket, copy to a new array.
     if (idx < length) {
       for (int i = idx; i < length; i += blockDim.x) {
+        printf ("block: %d\n", blockIdx.x);
         temp = elementToBucket[i];
         min = blockStart;
         max = blockEnd;
@@ -1261,9 +1262,9 @@ timing(1,6);
       if (uniqueBuckets[i] >= j * numSubBuckets) {
         h_blockBounds[j] = i;
         j++;
-	printf("j %d\n",j);
+	//printf("j %d\n",j);
       } 
-	printf("i %d\n",i);
+      //printf("i %d\n",i);
     }
 
     int* d_blockBounds;
@@ -1272,11 +1273,11 @@ timing(1,6);
 
     CUDA_CALL(cudaMalloc (&newInputAlt, sizeof(T) * newInputLength));
     cudaThreadSynchronize();
-
+    
     copyElements_recurse<T><<<numUniqueBuckets, threadsPerBlock,
       2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
                                   d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets
-                                  , d_blockBounds, newInputLength, sumsRowIndex);
+                                  , d_blockBounds newInputLength, sumsRowIndex);
 
     cudaDeviceSynchronize();
     printf ("post malloc\n");
