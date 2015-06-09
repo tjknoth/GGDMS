@@ -676,8 +676,6 @@ namespace BucketMultiselectNew2{
         atomicAdd(d_bucketCount + i + sumsRowIndex, counts[i]);
       }
     } // end if (blockIdx.x < numBigBuckets)
-    if (idx < 1)    
-      printf ("leaving\n");
   } // end kernel
 
 
@@ -912,6 +910,7 @@ namespace BucketMultiselectNew2{
     cudaMemcpy (pivots + numPivots - 2, d_randoms + sizeOfSample - endOffset - 1, 
                 sizeof (T), cudaMemcpyDeviceToHost);
     slopes[0] = numSmallBuckets / ((double)pivots[1] - (double)pivots[0]);
+    
 
     for (register int i = 2; i < numPivots - 2; i++) {
       cudaMemcpy (pivots + i, d_randoms + pivotOffset * (i - 1) + endOffset - 1, 
@@ -1298,26 +1297,30 @@ namespace BucketMultiselectNew2{
     
     int numSubBuckets = (int) numBuckets / numUniqueBuckets;
     // Vector to keep track of which unique buckets were created by a given block
-    int* blockBounds = (int*) malloc(numUniqueBuckets * sizeof(int));
+    int* h_blockBounds = (int*) malloc(numUniqueBuckets * sizeof(int));
     printf("1\n");
     // Create this vector by iterating through uniqueBuckets, finding boundaries of buckets
     //   created by each block.
     int j = 0;
     for (int i = 0; i < numUniqueBuckets; i++) {
-      if (uniqueBuckets[i] > j * numSubBuckets) {
-        blockBounds[j] = i;
+      if (uniqueBuckets[i] >= j * numSubBuckets) {
+        h_blockBounds[j] = i;
         j++;
       } 
     }
+
+    int* d_blockBounds;
+    CUDA_CALL(cudaMalloc(&d_blockBounds, numUniqueBuckets * sizeof(int)));
+    CUDA_CALL(cudaMemcpy(d_blockBounds, h_blockBounds, numUniqueBuckets * sizeof(int), cudaMemcpyHostToDevice));
 
     CUDA_CALL(cudaMalloc (&newInputAlt, sizeof(T) * newInputLength));
     cudaThreadSynchronize();
 
     copyElements_tree_recurse<T><<<numUniqueBuckets, threadsPerBlock, 
       2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
-                                  d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets, blockBounds);
+                                  d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets, d_blockBounds);
 
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
     printf ("post malloc\n");
     SAFEcuda("copyElements");
 
