@@ -444,7 +444,7 @@ namespace BucketMultiselectNew2{
       for (int i = 0; i < numUniqueBlock; i += blockDim.x) {
         sharedBuckets[i + threadIdx.x] = uniqueBuckets[i + threadIdx.x + blockStart];
       }
-
+	printf("\n 1 \n");
     syncthreads ();
 
     int idx = threadIdx.x;
@@ -459,7 +459,7 @@ namespace BucketMultiselectNew2{
         min = blockStart;
         max = blockEnd;
         compare = 0;
-      
+	printf("\n 2 \n");      
         // Binary search
         for (int j = 1; j <= numUniqueBlock; j *= 2) {
           mid = (max + min) / 2;
@@ -467,18 +467,19 @@ namespace BucketMultiselectNew2{
           min = compare ? mid : min;
           max = compare ? max : mid;
         } //end for
-           
+        syncthreads();   
         if (uniqueBuckets[max] == temp) {
           //printf ("index = %d, max = %d\n", i, uniqueBuckets[max]);
           //int k = atomicDec(d_bucketCount + temp + sumsRowIndex, newLength) - 1;
           newArray[atomicDec(d_bucketCount + temp + sumsRowIndex, newLength) - 1] = d_vector[i];
+	printf("\n 3 \n");
           //newArray[k] = d_vector[i];
           //printf ("index = %d, val = %f, block = %d\n", k, newArray[k], blockIdx.x);
         } // end if (uniqueBuckets[max] == temp)
       } //end for
     } // end if (idx < length)
 
-  }  // ends copyElements_tree kernel
+  }  // ends copyElements_recurse kernel
 
 
   /* Function to split existing buckets into sub-buckets and allocate data accordingly
