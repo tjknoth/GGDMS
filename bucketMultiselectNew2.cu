@@ -425,8 +425,9 @@ namespace BucketMultiselectNew2{
 
   template <typename T>
   __global__ void copyElements_recurse (T* d_vector, int length, uint* elementToBucket
-                                             , uint * uniqueBuckets, T* newArray, int numBlocks
-                                             , uint * d_bucketCount, int numBuckets, int* blockBounds) {
+                                        , uint * uniqueBuckets, T* newArray, int numBlocks
+                                        , uint * d_bucketCount, int numBuckets, int* blockBounds
+                                        , int newLength, int sumsRowIndex) {
 
     
     // OLD BST VERSION IS IN /MAP/testFile.cu
@@ -1274,7 +1275,8 @@ timing(1,6);
 
     copyElements_recurse<T><<<numUniqueBuckets, threadsPerBlock,
       2 * numKs * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
-                                  d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets, d_blockBounds);
+                                  d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets
+                                  , d_blockBounds, newInputLength, sumsRowIndex);
 
     cudaDeviceSynchronize();
     printf ("post malloc\n");
