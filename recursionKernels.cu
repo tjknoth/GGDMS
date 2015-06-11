@@ -1,4 +1,6 @@
 // -*- c++ -*-
+#include <stdio.h>
+#include <stdlib.h>
 
 
 /* Kernel to create new minimums and new slopes which define the new buckets
@@ -147,61 +149,117 @@ printf("Blk %d, thd %d, buck %d\n", blockIdx.x, threadIdx.x, elementToBucket[i])
 
 
 
-  template <typename T>
-  __global__ void copyElements_recurse (T* d_vector, int length, uint* elementToBucket
-                                        , uint * uniqueBuckets, T* newArray, int numBlocks
-                                        , uint * d_bucketCount, int numBuckets, int* blockBounds
-                                        , int newLength, uint* activeBucketCounts) {
+  // template <typename T>
+  // __global__ void copyElements_recurse (T* d_vector, int length, uint* elementToBucket
+  //                                       , uint * uniqueBuckets, T* newArray, int numBlocks
+  //                                       , uint * d_bucketCount, int numBuckets, int* blockBounds
+  //                                       , int newLength, uint* activeBucketCounts) {
 
 
 
-    // Calculate blockStart and blockEnd, the number of buckets created by blocks up through
-    //   blockIdx.x - 1, and the number of buckets create by blocks through blockIdx.x, respectively
-    int blockStart = blockBounds[blockIdx.x];
-    int blockEnd = blockBounds[blockIdx.x + 1] - 1;
-    __shared__ int numUniqueBlock;
-    numUniqueBlock = blockEnd - blockStart + 1;
-    uint bucketSize = activeBucketCounts[blockIdx.x];
+  //   // Calculate blockStart and blockEnd, the number of buckets created by blocks up through
+  //   //   blockIdx.x - 1, and the number of buckets create by blocks through blockIdx.x, respectively
+  //   int blockStart = blockBounds[blockIdx.x];
+  //   int blockEnd = blockBounds[blockIdx.x + 1] - 1;
+  //   __shared__ int numUniqueBlock;
+  //   numUniqueBlock = blockEnd - blockStart + 1;
+  //   uint bucketSize = activeBucketCounts[blockIdx.x];
 
-    extern __shared__ uint sharedBuckets[];
+  //   extern __shared__ uint sharedBuckets[];
   
-    // Read relevant unique buckets for a given block into shared memory
-    if (threadIdx.x < numUniqueBlock)
-      for (int i = 0; i < numUniqueBlock; i += blockDim.x) {
-        sharedBuckets[i + threadIdx.x] = uniqueBuckets[i + threadIdx.x + blockStart];
-      }
-    syncthreads ();
+  //   // Read relevant unique buckets for a given block into shared memory
+  //   if (threadIdx.x < numUniqueBlock)
+  //     for (int i = 0; i < numUniqueBlock; i += blockDim.x) {
+  //       sharedBuckets[i + threadIdx.x] = uniqueBuckets[i + threadIdx.x + blockStart];
+  //     }
+  //   syncthreads ();
 
-    int idx = threadIdx.x;
-    int temp, min, max, mid, compare;
+  //   int idx = threadIdx.x;
+  //   int temp, min, max, mid, compare;
   
-    // For each element, binary search through active buckets to see if the element is relevant.
-    //  If it's in an active bucket, copy to a new array.
-    if (idx < bucketSize) {
-      for (int i = idx; i < bucketSize; i += blockDim.x) {
-        temp = elementToBucket[i];
-        min = 0;
-        max = blockEnd - blockStart;
-        compare = 0;  
-        // Binary search
-        for (int j = 1; j < numUniqueBlock; j *= 2) {
-          mid = (max + min) / 2;
-          compare = temp > sharedBuckets[mid];
-          min = compare ? mid : min;
-          max = compare ? max : mid;
-        } //end for
-        syncthreads();
-        if (sharedBuckets[max] == temp) {
-          //printf ("index = %d, max = %d\n", i, uniqueBuckets[max]);
-          //int k = atomicDec(d_bucketCount + temp, newLength) - 1;
-          newArray[atomicDec(d_bucketCount + temp, newLength) - 1] = d_vector[i];
-          //newArray[k] = d_vector[i];
-          //printf ("index = %d, val = %f, block = %d\n", k, newArray[k], blockIdx.x);
-        } // end if (uniqueBuckets[max] == temp)
-      } //end for
-    } // end if (idx < length)
-  }  // ends copyElements_recurse kernel
+  //   // For each element, binary search through active buckets to see if the element is relevant.
+  //   //  If it's in an active bucket, copy to a new array.
+   //   if (idx < bucketSize) {
+   //     for (int i = idx; i < bucketSize; i += blockDim.x) {
+   //       temp = elementToBucket[i];
+   //       min = 0;
+   //       max = blockEnd - blockStart;
+   //       compare = 0;  
+   //       // Binary search
+   //       for (int j = 1; j < numUniqueBlock; j *= 2) {
+   //         mid = (max + min) / 2;
+   //         compare = temp > sharedBuckets[mid];
+   //         min = compare ? mid : min;
+   //         max = compare ? max : mid;
+   //       } //end for
+   //       syncthreads();
+   //       if (sharedBuckets[max] == temp) {
+   //         //printf ("index = %d, max = %d\n", i, uniqueBuckets[max]);
+   //         //int k = atomicDec(d_bucketCount + temp, newLength) - 1;
+   //         newArray[atomicDec(d_bucketCount + temp, newLength) - 1] = d_vector[i];
+   //         //newArray[k] = d_vector[i];
+   //         //printf ("index = %d, val = %f, block = %d\n", k, newArray[k], blockIdx.x);
+   //       } // end if (uniqueBuckets[max] == temp)
+   //     } //end for
+   //   } // end if (idx < length)
+   // }  // ends copyElements_recurse kernel
 
+
+template <typename T>
+__global__ void copyElements_recurse (T* d_vector, T* newArray, int length, uint* elementToBucket
+                                      , int numBuckets, int numBlocks, uint* d_bucketCount
+                                      , uint* oldReindexCounter, uint* d_uniqueBuckets) {
+
+  __shared__ uint elementsPerBlock;
+  __shared__ uint blockOffset;
+  int bucketsPerBlock;
+ 
+  extern __shared__ uint blockActiveBuckets[];
+
+  if (threadIdx.x < 1) {
+    int i, j = 0;
+    int firstBucket = numBuckets * blockIdx.x / numBlocks;
+    int lastBucket = (numBuckets * (blockIdx.x + 1) / numBlocks) - 1;
+    blockOffset = oldReindexCounter[blockIdx.x];
+    if (blockIdx.x + 1 < numBlocks)
+      elementsPerBlock = oldReindexCounter[blockIdx.x + 1] - blockOffset;
+    else
+      elementsPerBlock = length - blockOffset;
+    for (i = 0; d_uniqueBuckets[i] < firstBucket; i++);
+    while (d_uniqueBuckets[i] <= lastBucket) {
+      blockActiveBuckets[j] = d_uniqueBuckets[i];
+      i++;
+      j++;
+    } //end while
+    bucketsPerBlock = j;
+  } //end if (threadIdx.x < 1)
+
+  syncthreads();
+
+  int temp, min, max, mid, compare;
+
+  for (int i = threadIdx.x; i < elementsPerBlock; i += blockDim.x) {
+    uint index = i + blockOffset;
+    temp = elementToBucket[index];
+    min = 0;
+    max = bucketsPerBlock;
+    compare = 0;  
+    // Binary search
+    for (int j = 1; j < bucketsPerBlock + 1; j *= 2) {
+      mid = (max + min) / 2;
+      compare = temp > blockActiveBuckets[mid];
+      min = compare ? mid : min;
+      max = compare ? max : mid;
+    } //end for
+
+    if (temp == blockActiveBuckets[max]) {
+      //int k = atomicDec(d_bucketCount + temp + blockIdx.x * numBuckets, length) - 1;
+      newArray[atomicDec(d_bucketCount + temp + blockIdx.x * numBuckets, length) - 1] = d_vector[index];
+      //newArray[k] = d_vector[index];
+      //printf ("newArray[%d] = %f\n", k, d_vector[index]);
+    } //end if
+  } //end for
+} //end kernel
 
 
 
