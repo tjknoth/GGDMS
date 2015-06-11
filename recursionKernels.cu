@@ -1,4 +1,4 @@
-
+// -*- c++ -*-
 
 
 /* Kernel to create new minimums and new slopes which define the new buckets
@@ -154,7 +154,6 @@ printf("Blk %d, thd %d, buck %d\n", blockIdx.x, threadIdx.x, elementToBucket[i])
                                         , int newLength, uint* activeBucketCounts) {
 
 
-    // OLD BST VERSION IS IN /MAP/testFile.cu
 
     // Calculate blockStart and blockEnd, the number of buckets created by blocks up through
     //   blockIdx.x - 1, and the number of buckets create by blocks through blockIdx.x, respectively
@@ -180,22 +179,18 @@ printf("Blk %d, thd %d, buck %d\n", blockIdx.x, threadIdx.x, elementToBucket[i])
     //  If it's in an active bucket, copy to a new array.
     if (idx < bucketSize) {
       for (int i = idx; i < bucketSize; i += blockDim.x) {
-        //printf ("block: %d\n", blockIdx.x);
         temp = elementToBucket[i];
         min = 0;
         max = blockEnd - blockStart;
-        compare = 0;
-	//printf("\n 2 \n");      
+        compare = 0;  
         // Binary search
         for (int j = 1; j < numUniqueBlock; j *= 2) {
           mid = (max + min) / 2;
           compare = temp > sharedBuckets[mid];
           min = compare ? mid : min;
           max = compare ? max : mid;
-          //printf ("block: %d, max = %d\n", blockIdx.x, max);
         } //end for
         syncthreads();
-        // CHECK LOOP INVARIANT: USE MIN BELOW? < OR <= IN FOR LOOP?
         if (sharedBuckets[max] == temp) {
           //printf ("index = %d, max = %d\n", i, uniqueBuckets[max]);
           //int k = atomicDec(d_bucketCount + temp, newLength) - 1;
