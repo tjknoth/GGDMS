@@ -1139,11 +1139,12 @@ printf("\n before\n");
 
     int newInputLengthAlt = reindexCounter[numUniqueBuckets-1] 
       + h_bucketCount[kthBuckets[numKs - 1]];
-// *************
-for (int jj=0; jj<numKs; jj++){
-  printf("kvals[%d]=%d    ",jj,kVals[jj]);
-}
-printf("\n before\n");
+
+    // *************
+    for (int jj=0; jj<numKs; jj++){
+      printf("kvals[%d]=%d    ",jj,kVals[jj]);
+    }
+    printf("\n before\n");
 
     // reindex the counts
     CUDA_CALL(cudaMalloc(&d_reindexCounter, numUniqueBuckets * sizeof(uint)));
@@ -1195,21 +1196,30 @@ printf("\n before\n");
 
     SAFEcuda("before copy elements");
 
+    T* h_newInput = (T*) malloc (newInputLength * sizeof(T));
+    CUDA_CALL(cudaMemcpy(h_newInput, newInput, newInputLength * sizeof(T), cudaMemcpyDeviceToHost));
+    for (int ii = 0; ii < newInputLength; ii++)
+      printf ("newInput[%d] = %f\n", ii, h_newInput[ii]);
+
     //printf ("unique buckets: %d\n", numUniqueBuckets);
     copyElements_recurse<T><<<numUniqueBuckets, threadsPerBlock,
       numUniqueBuckets * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
-                                  d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets
+                                         d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets
                                          , d_blockBounds, newInputLengthAlt, d_reindexCounter);
 
     SAFEcuda("copyElements recurse");
 
     cudaDeviceSynchronize();
-    //printf ("post malloc\n");
-
+    printf ("post malloc\n");
+    T* h_newInputAlt = (T*) malloc (newInputLengthAlt * sizeof(T));
+    CUDA_CALL(cudaMemcpy(h_newInputAlt, newInputAlt, newInputLengthAlt * sizeof(T), cudaMemcpyDeviceToHost));
+    printf ("ok\n");
+    for (int ii = 0; ii < newInputLengthAlt; ii++)
+      printf ("newInputAlt[%d] = %f\n", ii, h_newInputAlt[ii]);
 
     // OLD STUFF BEGINS
 
-timing(0,7);
+    timing(0,7);
 
     sort_phase<T>(newInputAlt, newInputLengthAlt);
     SAFEcuda("sort_phase");
