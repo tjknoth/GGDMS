@@ -25,6 +25,7 @@
 
 #include <math.h>
 #include <ctime>
+#include "recursionKernels.cu"
 
 
 
@@ -425,7 +426,7 @@ namespace BucketMultiselectNew2{
   }  // ends copyElements_tree kernel
 
 
-
+/*
   template <typename T>
   __global__ void copyElements_recurse (T* d_vector, int length, uint* elementToBucket
                                         , uint * uniqueBuckets, T* newArray, int numBlocks
@@ -486,140 +487,11 @@ namespace BucketMultiselectNew2{
     } // end if (idx < length)
   }  // ends copyElements_recurse kernel
 
-
+*/
   /* Function to split existing buckets into sub-buckets and allocate data accordingly
    *
    * Notes: Make sure slopes is allocated. Get endpoints.
    */
-  template <typename T>
-  __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
-                                   uint * elementToBucket, uint* d_bucketCount
-                                   , uint offset, int length, int sumsRowIndex, const int numBigBuckets, int precount
-                                   , uint * d_uniqueBuckets, uint* bucketBounds, uint * reindexCounts) {
-
-    __shared__ T minimum;
-    __shared__ double slope;
-    __shared__ int previousBuckets;
-    __shared__ int numSubBuckets;
-
-
-    extern __shared__ uint array[];
-    uint* counts = (uint*) array;    
-
-
-    
-    // if (idx < 1) {
-    //   printf ("LENGTH: %d\n", length);
-    //   //bucketBounds[numBigBuckets] = length;
-    //   bucketBounds[0] = 0;
-    //   for (int i = 1; i <= numBigBuckets; i++) {
-    //     bucketBounds[i] = bucketBounds[i - 1] + d_bucketCount[d_uniqueBuckets[i - 1] + sumsRowIndex];
-    //     printf ("adding: %u\n", d_bucketCount[d_uniqueBuckets[i - 1] + sumsRowIndex]);
-    //   } // end if-else
-    //   //for (int i = 0; i < numBigBuckets + 1; i++)
-    //     //        printf ("bucketBounds[%d] = %u\n", i, bucketBounds[i]);
-    // }
-    if (threadIdx.x < 1) {  //printf("In the loop \n");
-      for (int i = 0; i < numBigBuckets; i++)
-        bucketBounds[i] = reindexCounts[i];
-      bucketBounds[numBigBuckets] = length;
-    }
-
-
-    syncthreads();
-
-    // One block is dedicated to each big bucket
-    if (blockIdx.x < numBigBuckets) {
-      // One thread calculates shared values of slope, min and number of previous buckets for this block
-      if (threadIdx.x < 1) {
-        //printf ("BUCKETS 0: %u, BUCKETS 1: %u, 2: %u, 3: %u\n", bucketBounds[0], bucketBounds[1], bucketBounds[2], bucketBounds[3]);
-
-        // Find which of the previous buckets we are in
-        int hugeBucket = (int) (d_uniqueBuckets[blockIdx.x] / precount);
-
-        // Calculate number of subbuckets per big bucket
-        numSubBuckets = (int) (numBuckets / numBigBuckets); 
-	//printf("\n subBuckets: %d \n",numSubBuckets);
-	//printf("\n d_uniqueBuckets[blockIdx.x] %u \n precount %d \n hugeBucket %d \n originalSlopes[hugeBucket]) %lf \n pivot %lf \n",
-               //d_uniqueBuckets[blockIdx.x],precount,hugeBucket,originalSlopes[hugeBucket],(float) pivots[hugeBucket]);
-	int localBucket = d_uniqueBuckets[blockIdx.x] - (precount * hugeBucket);				
-	//printf("\n local bucket: %d \n",localBucket);
-
-        // Calculate and store min and slope
-        minimum = localBucket / originalSlopes[hugeBucket] + pivots[hugeBucket];   
-	//printf("\n Min: %lf \n",minimum);
-        //        T maximum = ((localBucket + 1) / originalSlopes[hugeBucket]) + pivots[hugeBucket];
-        //	printf("\n Max: %lf \n",maximum);
-        slope = numSubBuckets * originalSlopes[hugeBucket];
-	//printf("\n Slope v1: %lf \n",slope);
-
-
-        // Calculate number of subbuckets for the previous big buckets
-        previousBuckets = (int) numSubBuckets * blockIdx.x;
-
-
-        //        precount[0] = numSubBuckets;	// wont work precount is on the host
-        originalSlopes[blockIdx.x] = slope;  // update the original slopes, make sure it is the right size
-      } // end if (threadIdx.x < 1)
-
-
-      // Initialize counts
-      for (int i = threadIdx.x; i < numBuckets; i += blockDim.x) {
-        counts[i] = 0;
-      }  // end for
-
-
-      syncthreads();
-
-      if (threadIdx.x+blockIdx.x < 1) {	
-	for (int i = 0; i < numBuckets; i++){
-	  if (d_bucketCount[i + sumsRowIndex] != 0) {
-	    //printf("d_buckcount[%d]=%d\n",i + sumsRowIndex,d_bucketCount[i + sumsRowIndex]);
-	    //d_bucketCount[i + sumsRowIndex] = 0;
-	    //printf("count[%d]=%d\n",i,d_bucketCount[i]);
-	  }
-	}
-      }
-
-      syncthreads(); 
-
-	
-      // reassign bucket numbers
-
-      // if (threadIdx.x<1) { printf("blockId = %d, start=%u bucketEnd=%u, previousBuckets=%d\n",blockIdx.x,bucketBounds[blockIdx.x],bucketBounds[blockIdx.x+1], previousBuckets);}
-
-      syncthreads();
-
-      for (int i = threadIdx.x + bucketBounds[blockIdx.x]; i < bucketBounds[blockIdx.x + 1]; i += blockDim.x) {
-        int bucketIndex = (int) (slope * (d_vector[i] - minimum)) + previousBuckets;
-	if (bucketIndex > numBuckets - 1) bucketIndex = numBuckets - 1;
-	elementToBucket[i] = bucketIndex;
-        //printf("bucketIndex=%u and elementToBucket[%d]=%u\n",bucketIndex,i,elementToBucket[i]);
-        atomicInc(counts + bucketIndex, length);
-      }		
-	
-      syncthreads();
-
-      // counts to d_bucketCount	
-      //      int sumsRowIndex= numBuckets * (numBlocks-1);
-      for (int i = threadIdx.x; i < numBuckets; i += blockDim.x) {
-        if (counts[i]!=0) { 
-          //printf("counts[%d]=%d\n",i,counts[i]); 
-          atomicAdd(d_bucketCount + i + sumsRowIndex, counts[i]);
-        }
-      }
-    } // end if (blockIdx.x < numBigBuckets)
-    syncthreads(); 
-    if (threadIdx.x < 1) {	
-      for (int i = 0; i < numBuckets; i++){
-        if (d_bucketCount[i + sumsRowIndex] != 0) {
-          //printf("d_buckcount[%d]=%d\n",i,d_bucketCount[i + sumsRowIndex]);
-        }
-      }
-    }
-  } // end recreateBuckets kernel
-
-
 
 
   /* Function to check if any order statistics have been found, unmarks buckets if so
@@ -976,7 +848,7 @@ namespace BucketMultiselectNew2{
     uint * d_uniqueBuckets; 
     uint reindexCounter[numKs];  
     uint * d_reindexCounter;    
-    int precount;
+//    int precount;
 
     CUDA_CALL(cudaMalloc(&d_kVals, numKs * sizeof(uint)));
     CUDA_CALL(cudaMalloc(&d_kIndices, numKs * sizeof (uint)));
@@ -1173,35 +1045,48 @@ namespace BucketMultiselectNew2{
     /// ***********************************************************
     timing(0,6);
 
+    uint numOldActive, numNewActive, oldNumSmallBuckets, newNumSmallBuckets;
+    numOldActive = numPivots - 1;
+    numNewActive = numUniqueBuckets;
+    oldNumSmallBuckets = numBuckets/numOldActive;
+    newNumSmallBuckets = numBuckets/numNewActive;
 
+    T * d_newMinimums;
+    double * d_newSlopes;
+    CUDA_CALL(cudaMalloc(&d_newMinimums, numNewActive * sizeof(T)));
+    CUDA_CALL(cudaMalloc(&d_newSlopes, numNewActive * sizeof(double)));
 
-    precount = numBuckets/(numPivots - 1);
- 
-
-    int sumsRowIndex= numBuckets * (numBlocks-1);
-    setToAllZero<uint>(d_bucketCount + sumsRowIndex, numBuckets);
-
-    uint *d_bucketBounds;
-    CUDA_CALL(cudaMalloc(&d_bucketBounds, (numUniqueBuckets + 1) * sizeof(uint)));
-
-    cudaDeviceSynchronize();
-
-
+    int reacreateThreads = 128;
+    int recreateBlocks = numNewActive/reacreateThreads + 1;
     // Recreate sub-buckets
 
-    recreateBuckets<T><<<numUniqueBuckets
-      ,threadsPerBlock,sizeof(uint) * numBuckets>>>(newInput, numBuckets, d_slopes, d_pivots
-                                                    , d_elementToBucket, d_bucketCount
-                                                    , offset, newInputLength, sumsRowIndex, numUniqueBuckets, precount
-                                                    , d_uniqueBuckets, d_bucketBounds, d_reindexCounter);
+    recreateBuckets<T><<<recreateBlocks, reacreateThreads, numOldActive*(sizeof(T) + sizeof(double))>>>(d_uniqueBuckets, d_newSlopes, d_newMinimums, numNewActive, d_slopes, d_pivots, numOldActive, oldNumSmallBuckets, newNumSmallBuckets);
 
-
+// *******
+/*
+T* h_mins = (T *) malloc (numNewActive * sizeof (T));
+double* h_slopes= (double *) malloc (numNewActive * sizeof (double));
+    CUDA_CALL(cudaMemcpy(h_mins, d_newMinimums, 
+                         numNewActive * sizeof (T), cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaMemcpy(h_slopes, d_newSlopes, 
+                         numNewActive * sizeof (double), cudaMemcpyDeviceToHost));
+for (int j=0; j<numNewActive; j++){
+std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_slopes[j] << std::endl;
+}
+*/
+// **********
+   
     cudaDeviceSynchronize();
-
     SAFEcuda("recreateBuckets");
 
-    CUDA_CALL(cudaMemcpy(h_bucketCount, d_bucketCount + numBuckets*(numBlocks-1), 
-                         sizeof(uint) * numBuckets, cudaMemcpyDeviceToHost));
+
+    reassignBuckets<T><<<numNewActive, threadsPerBlock, newNumSmallBuckets*sizeof(uint)>>>(newInput, newInputLength, d_reindexCounter, d_newSlopes, d_newMinimums, numNewActive, newNumSmallBuckets, d_elementToBucket, d_bucketCount);
+
+    cudaDeviceSynchronize();
+    SAFEcuda("reassignBuckets");
+
+    CUDA_CALL(cudaMemcpy(d_bucketCount + numBuckets * (numBlocks-1), d_bucketCount, 
+                         sizeof(uint) * numBuckets, cudaMemcpyDeviceToDevice));
 
 //	for (int i = 0; i < numBuckets; i++){
 //	  if (h_bucketCount[i] != 0) {
@@ -1223,6 +1108,11 @@ namespace BucketMultiselectNew2{
     SAFEcuda("pre findKBuckets");
     
     //printf ("unique buckets (findk): %d\n", numUniqueBuckets);
+// *************
+for (int jj=0; jj<numKs; jj++){
+  printf("kvals[%d]=%d    ",jj,kVals[jj]);
+}
+printf("\n before\n");
 
     findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
                  kthBucketScanner, kthBuckets, numBlocks);
@@ -1247,9 +1137,13 @@ namespace BucketMultiselectNew2{
       kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
     }
 
-    newInputLength = reindexCounter[numUniqueBuckets-1] 
+    int newInputLengthAlt = reindexCounter[numUniqueBuckets-1] 
       + h_bucketCount[kthBuckets[numKs - 1]];
-
+// *************
+for (int jj=0; jj<numKs; jj++){
+  printf("kvals[%d]=%d    ",jj,kVals[jj]);
+}
+printf("\n before\n");
 
     // reindex the counts
     CUDA_CALL(cudaMalloc(&d_reindexCounter, numUniqueBuckets * sizeof(uint)));
@@ -1278,7 +1172,7 @@ namespace BucketMultiselectNew2{
     int j = 0;
     int i;
     for (i = 0; i < numUniqueBuckets; i++) {
-      if (uniqueBuckets[i] >= j * numSubBuckets) {
+      if (uniqueBuckets[i] >= j * newNumSmallBuckets) {
         h_blockBounds[j] = i;
         j++;
       } 
@@ -1305,7 +1199,7 @@ namespace BucketMultiselectNew2{
     copyElements_recurse<T><<<numUniqueBuckets, threadsPerBlock,
       numUniqueBuckets * sizeof(uint)>>>(newInput, newInputLength, d_elementToBucket, 
                                   d_uniqueBuckets, newInputAlt, numBlocks, d_bucketCount, numBuckets
-                                         , d_blockBounds, newInputLength, sumsRowIndex, d_reindexCounter);
+                                         , d_blockBounds, newInputLengthAlt, d_reindexCounter);
 
     SAFEcuda("copyElements recurse");
 
@@ -1317,7 +1211,7 @@ namespace BucketMultiselectNew2{
 
 timing(0,7);
 
-    sort_phase<T>(newInput, newInputLength);
+    sort_phase<T>(newInputAlt, newInputLengthAlt);
     SAFEcuda("sort_phase");
 
     T * d_output = (T *) d_elementToBucket;
