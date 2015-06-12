@@ -427,18 +427,18 @@ namespace BucketMultiselectNew2{
   template <typename T>
   __global__ void copyElements_recursive (T* d_vector, T* newArray, int length, uint* elementToBucket
                                         , int numBuckets, int numBlocks, uint* d_bucketCount
-                                        , uint* oldReindexCounter, uint* d_uniqueBuckets) {
+                                          , uint* oldReindexCounter, uint* d_uniqueBuckets, int numOldBlocks) {
 
     __shared__ uint elementsPerBlock;
     __shared__ uint blockOffset;
-    int bucketsPerBlock;
+    __shared__ int bucketsPerBlock;
  
     extern __shared__ uint blockActiveBuckets[];
 
     if (threadIdx.x < 1) {
       int i, j = 0;
       int firstBucket = numBuckets * blockIdx.x / numBlocks;
-      int lastBucket = (numBuckets * (blockIdx.x + 1) / numBlocks) - 1;
+      int lastBucket = (int) (numBuckets * (blockIdx.x + 1) / numBlocks) - 1;
       blockOffset = oldReindexCounter[blockIdx.x];
       if (blockIdx.x + 1 < numBlocks)
         elementsPerBlock = oldReindexCounter[blockIdx.x + 1] - blockOffset;
@@ -447,12 +447,11 @@ namespace BucketMultiselectNew2{
       for (i = 0; d_uniqueBuckets[i] < firstBucket; i++);
       while (d_uniqueBuckets[i] <= lastBucket) {
         blockActiveBuckets[j] = d_uniqueBuckets[i];
-        printf ("active = %d\n", d_uniqueBuckets[i]);
+        //printf("block %d has an active bucket\n", blockIdx.x);
         i++;
         j++;
       } //end while
       bucketsPerBlock = j;
-      //printf ("block = %d\n", blockIdx.x);
     } //end if (threadIdx.x < 1)
 
     syncthreads();
@@ -462,29 +461,31 @@ namespace BucketMultiselectNew2{
     for (int i = threadIdx.x; i < elementsPerBlock; i += blockDim.x) {
       uint index = i + blockOffset;
       temp = elementToBucket[index];
-      printf ("block = %d, temp = %d\n", blockIdx.x, temp);
+      //printf ("block = %d, temp = %d, element = %f\n", blockIdx.x, temp, d_vector[index]);
       min = 0;
       max = bucketsPerBlock;
+      //printf ("orig max = %d\n", max);
       compare = 0;  
-      // Binary search
       for (int j = 1; j < bucketsPerBlock + 1; j *= 2) {
         mid = (max + min) / 2;
         compare = temp > blockActiveBuckets[mid];
         min = compare ? mid : min;
         max = compare ? max : mid;
       } //end for
-
-      if (temp == blockActiveBuckets[max]) {
-        //printf ("found\n");
-        //int k = atomicDec(d_bucketCount + temp + blockIdx.x * numBuckets, length) - 1;
-        newArray[atomicDec(d_bucketCount + temp + blockIdx.x * numBuckets, length) - 1] = d_vector[index];
-        //newArray[k] = d_vector[index];
-        //printf ("newArray[%d] = %f\n", k, d_vector[index]);
+      //printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
+      if (temp == blockActiveBuckets[max]) {    
+        //printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
+        //printf ("TRUE\n");
+        int k = atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1;
+        //newArray[atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1] = d_vector[index];
+        newArray[k] = d_vector[index];
+        //newArray[blockIdx.x] = d_vector[index];
+        printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
       } //end if
     } //end for
-    syncthreads();
-    if (threadIdx.x < 1)
-      printf ("newArray[%d] = %f\n", blockIdx.x, newArray[blockIdx.x]);
+    // syncthreads();
+    // if (threadIdx.x < 1)
+    //   printf ("newArr[%d] = %f\n", blockIdx.x, newArray[blockIdx.x]);
   } //end kernel
 
 
@@ -1174,10 +1175,10 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
 
     SAFEcuda("before copy elements");
 
-     T* h_newInput = (T*) malloc (newInputLength * sizeof(T));
-     CUDA_CALL(cudaMemcpy(h_newInput, newInput, newInputLength * sizeof(T), cudaMemcpyDeviceToHost));
-     for (int ii = 0; ii < newInputLength; ii++)
-       printf ("newInput[%d] = %f\n", ii, h_newInput[ii]);
+     // T* h_newInput = (T*) malloc (newInputLength * sizeof(T));
+     // CUDA_CALL(cudaMemcpy(h_newInput, newInput, newInputLength * sizeof(T), cudaMemcpyDeviceToHost));
+     // for (int ii = 0; ii < newInputLength; ii++)
+     //   printf ("newInput[%d] = %f\n", ii, h_newInput[ii]);
 
     // T* h_newInputAlt = (T*) malloc (newInputLengthAlt * sizeof(T));
     // CUDA_CALL(cudaMemcpy(h_newInputAlt, newInputAlt, newInputLengthAlt * sizeof(T), cudaMemcpyDeviceToHost));
@@ -1187,7 +1188,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     //printf ("unique buckets: %d\n", numUniqueBuckets);
     copyElements_recursive<T><<<numNewActive, threadsPerBlock,
       numNewActive * sizeof(uint)>>>(newInput, newInputAlt, newInputLength, d_elementToBucket
-                                     , numBuckets, numNewActive, d_bucketCount, d_oldReindexCounter, d_uniqueBuckets);
+                                     , numBuckets, numNewActive, d_bucketCount, d_oldReindexCounter, d_uniqueBuckets, numBlocks);
 
     SAFEcuda("copyElements recurse");
 
@@ -1198,6 +1199,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     // OLD STUFF BEGINS
 
     timing(0,7);
+    printf ("NEW LENGTH = %d\n", newInputLengthAlt);
 
     sort_phase<T>(newInputAlt, newInputLengthAlt);
     SAFEcuda("sort_phase");
@@ -1212,7 +1214,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     CUDA_CALL(cudaMemcpy (d_kIndices, kIndices, numKs * sizeof (uint), 
                           cudaMemcpyHostToDevice));
 
-    copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, newInput, d_kVals, d_kIndices, numKs);
+    copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, newInputAlt, d_kVals, d_kIndices, numKs);
     SAFEcuda("copyValuesInChunk");
 
     CUDA_CALL(cudaMemcpy (output, d_output, 
@@ -1232,10 +1234,11 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     cudaFree(d_kVals); 
     cudaFree(newInput); 
     cudaFree(newInputAlt);
-    free(h_newInput);
+    //free(h_newInput);
     //free(h_newInputAlt);
     cudaFree(d_oldReindexCounter);
     free (kIndices - kOffsetMin);
+    //cudaDeviceReset();
 
 
     /// ***********************************************************
