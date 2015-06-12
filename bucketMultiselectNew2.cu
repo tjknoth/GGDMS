@@ -424,6 +424,8 @@ namespace BucketMultiselectNew2{
   }  // ends copyElements_tree kernel
 
 
+
+
   template <typename T>
   __global__ void copyElements_recursive (T* d_vector, T* newArray, int length, uint* elementToBucket
                                         , int numBuckets, int numBlocks, uint* d_bucketCount
@@ -457,6 +459,7 @@ namespace BucketMultiselectNew2{
         j++;
       } //end while
       bucketsPerBlock = j;
+      blockActiveBuckets[bucketsPerBlock]=lastBucket+1;
     } //end if (threadIdx.x < 1)
 
     syncthreads();
@@ -481,11 +484,11 @@ namespace BucketMultiselectNew2{
       if (temp == blockActiveBuckets[max]) {    
         //printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
         //printf ("TRUE\n");
-        //int k = atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1;
-        newArray[atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1] = d_vector[index];
-        //newArray[k] = d_vector[index];
+        int k = atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1;
+        //newArray[atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1] = d_vector[index];
+        newArray[k] = d_vector[index];
         //newArray[blockIdx.x] = d_vector[index];
-        //printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
+        printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
       } //end if
     } //end for
     // syncthreads();
@@ -1040,6 +1043,8 @@ namespace BucketMultiselectNew2{
     uint* d_oldReindexCounter;
     CUDA_CALL(cudaMalloc(&d_oldReindexCounter, numUniqueBuckets * sizeof(uint)));
 
+    uint* tempReindex;
+
     CUDA_CALL(cudaMalloc (&newInputAlt, sizeof(T) * newInputLength));
 
     uint numOldActive, numNewActive, oldNumSmallBuckets, newNumSmallBuckets;
@@ -1097,7 +1102,9 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     //	  }
     //	}
 
+    tempReindex = d_oldReindexCounter;
     d_oldReindexCounter = d_reindexCounter;
+    d_reindexCounter = tempReindex;
 
 
     // Use setToAllZero?
@@ -1196,7 +1203,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
 
     SAFEcuda("copyElements recurse");
 
-    cudaDeviceSynchronize();
+    //cudaThreadSynchronize();
     
 
     cudaFree(d_pivots);
