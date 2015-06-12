@@ -451,15 +451,16 @@ namespace BucketMultiselectNew2{
         lastBucket = numBuckets - 1;
         elementsPerBlock = length - blockOffset;
       }
+      //printf ("block = %d, first = %d, last = %d\n", blockIdx.x, firstBucket, lastBucket);
       for (i = 0; d_uniqueBuckets[i] < firstBucket; i++);
-      while (d_uniqueBuckets[i] <= lastBucket) {
+      while ((i < numBlocks) && (d_uniqueBuckets[i] <= lastBucket)) {
         blockActiveBuckets[j] = d_uniqueBuckets[i];
-        //printf("block %d has an active bucket\n", blockIdx.x);
         i++;
         j++;
       } //end while
       bucketsPerBlock = j;
       blockActiveBuckets[bucketsPerBlock]=lastBucket+1;
+      printf ("block = %d, offset = %u, bucketsPerBlock = %d, elementsPerBlock = %d\n", blockIdx.x, blockOffset, bucketsPerBlock, elementsPerBlock);
     } //end if (threadIdx.x < 1)
 
     syncthreads();
@@ -487,8 +488,8 @@ namespace BucketMultiselectNew2{
         int k = atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1;
         //newArray[atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1] = d_vector[index];
         newArray[k] = d_vector[index];
-        //newArray[blockIdx.x] = d_vector[index];
         printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
+        //newArray[blockIdx.x] = d_vector[index];
       } //end if
     } //end for
     // syncthreads();
@@ -1081,7 +1082,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
 */
 // **********
    
-    cudaDeviceSynchronize();
+    cudaThreadSynchronize();
     SAFEcuda("recreateBuckets");
 
 
@@ -1090,7 +1091,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
                                            , d_newMinimums, numNewActive, newNumSmallBuckets
                                            , d_elementToBucket, d_bucketCount);
 
-    cudaDeviceSynchronize();
+    cudaThreadSynchronize();
     SAFEcuda("reassignBuckets");
 
     CUDA_CALL(cudaMemcpy(d_bucketCount + numBuckets * (numBlocks-1), d_bucketCount, 
@@ -1113,7 +1114,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     
     SAFEcuda("post set all to zero");
 
-    cudaDeviceSynchronize();
+    cudaThreadSynchronize();
     
     timing(1,6);
      
@@ -1159,30 +1160,30 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     // printf("\n before\n");
 
     // reindex the counts
-    CUDA_CALL(cudaMalloc(&d_reindexCounter, numUniqueBuckets * sizeof(uint)));
-    CUDA_CALL(cudaMalloc(&d_uniqueBuckets, numUniqueBuckets * sizeof(uint)));
+    //CUDA_CALL(cudaMalloc(&d_reindexCounter, numUniqueBuckets * sizeof(uint)));
+    //CUDA_CALL(cudaMalloc(&d_uniqueBuckets, numUniqueBuckets * sizeof(uint)));
 
     CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
-    printf("NumBuckets: %d\n", numUniqueBuckets);
+    //printf("NumBuckets: %d\n", numUniqueBuckets);
     reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
       threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
                          d_uniqueBuckets, numUniqueBuckets);
     SAFEcuda("reindexCounts");
 
-    CUDA_CALL(cudaMemcpy(uniqueBuckets, d_uniqueBuckets
-                         , numUniqueBuckets * sizeof(uint), cudaMemcpyDeviceToHost)); 
+    //CUDA_CALL(cudaMemcpy(uniqueBuckets, d_uniqueBuckets
+    //                     , numUniqueBuckets * sizeof(uint), cudaMemcpyDeviceToHost)); 
     
 
     cudaThreadSynchronize();
     
 
-    for (register int i = numUniqueBuckets - 1; i > 0; i--)
-      reindexCounter[i] -= reindexCounter[i - 1];
+    // for (register int i = numUniqueBuckets - 1; i > 0; i--)
+    //   reindexCounter[i] -= reindexCounter[i - 1];
 
-    CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+    //CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
 
     SAFEcuda("before copy elements");
 
@@ -1203,7 +1204,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
 
     SAFEcuda("copyElements recurse");
 
-    //cudaThreadSynchronize();
+    //cudaThreadynchronize();
     
 
     cudaFree(d_pivots);
@@ -1212,7 +1213,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     free(h_bucketCount);
     cudaFree(d_bucketCount);
     cudaFree(d_uniqueBuckets); 
-    cudaFree(d_reindexCounter);
+    //cudaFree(d_reindexCounter);
     cudaFree(d_oldReindexCounter);
     cudaFree(d_newMinimums);
     cudaFree(d_newSlopes);
