@@ -5,7 +5,7 @@
 __device__ void d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint * markedBuckets, 
                                     uint * sums, const int numNewSmallBuckets, 
                                     const int blockBucketOffset, const int blockStart,  
-                                    const int bockNumKs, const int blockKsOffset)
+                                    const int blockNumKs, const int blockKsOffset)
  {
     int kBucket = blockBucketOffset;
     int blockMaxBucket = blockBucketOffset + numNewSmallBuckets;
@@ -20,7 +20,7 @@ __device__ void d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint *
         sum += temp;     
         kBucket++;
       } // end while
-      markedBuckets[blockKsOffset + i] = kBucket;
+      markedBuckets[blockKsOffset + i] = kBucket-1;
 
       sums[blockKsOffset + i] = sum - temp; 
 
@@ -36,36 +36,48 @@ __device__ void d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint *
  * blocks to achieve numOldActive total threads.
  * No shared memory required.
 */
-__global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals, uint * d_markedBuckets, uint * d_sums, uint * d_bucketBounds, uint * d_KBounds, const int numNewSmallBuckets, const int numOldActive)
+__global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals, uint * d_markedBuckets, uint * d_sums, uint * d_bucketBounds, uint * d_KBounds, const int numNewSmallBuckets, const int numOldActive, const int numKs)
  {
    int index = blockDim.x * blockIdx.x + threadIdx.x;
    int blockKsOffset, blockNumKs;
    if (index < numOldActive) {
      blockKsOffset = d_KBounds[index];
      blockNumKs = d_KBounds[index+1] - blockKsOffset;
+     if (index+1 == numOldActive) blockNumKs = numKs - blockKsOffset;
      d_findKBucketsByBlock ( d_bucketCount, d_kVals, d_markedBuckets, d_sums,
                              numNewSmallBuckets, numNewSmallBuckets*index, d_bucketBounds[index],
                              blockNumKs, blockKsOffset);
+printf("\n thread %d,  blockNumKs %d, blockKsOffset %d \n", index, blockNumKs, blockKsOffset);
+for (int i=0; i<blockNumKs; i++)
+  printf("markedBuckets[blockKsOffset + i]=%d      ", d_markedBuckets[blockKsOffset + i]);
+  
    } // end if index
  } // end kernel findKbucketByBlock_kernel
 
 
-
+/*
 // the host function to find k buckets by block
-inline void findKbucketsByBlock ()
+inline void findKbucketsByBlock (uint * d_bucketCount, uint * d_bucketBounds,
+                                 uint * h_blockBounds, uint * h_markedBuckets, uint * h_sums, uint * kVals, const uint numOldActive, const uint numNewSmallBuckets, const uint numKs)
  {
 
 // create device variables for marked buckets, sums, kVals
-   uint *d_kVals, *d_markedBuckets, *d_sums;
+   uint *d_kVals, *d_markedBuckets, *d_sums, *d_Kbounds;
    CUDA_CALL(cudaMalloc(&d_kVals, numKs * sizeof(uint)));
    CUDA_CALL(cudaMalloc(&d_markedBuckets, numKs * sizeof(uint)));
    CUDA_CALL(cudaMalloc(&d_sums, numKs * sizeof(uint)));
+   CUDA_CALL(cudaMalloc(&d_Kbounds, (numOldActive+1) * sizeof(uint)));
 
-   uint *d_blockKsOffset;
-   CUDA_CALL(cudaMalloc(&d_blockKsOffset, numOldActive * sizeof(uint)));
+   CUDA_CALL(cudaMemcpy (d_kVals, kVals, numKs * sizeof (uint), 
+                          cudaMemcpyHostToDevice));
+   setToAllZero<uint>(d_markedBuckets, numKs);
+   setToAllZero<uint>(d_sums, numKs);
+
 // (since this is potentiall recursive, these should be preallocated)
 
 // compute Kbounds and copy to device
+   uint blockOffset;
+   uint Kbounds[numOldActive+1];
    Kbounds[0]=0;
    uint j = 0;
    uint i = 1;
@@ -93,10 +105,19 @@ inline void findKbucketsByBlock ()
    findKbucketsByBlock_kernel<<<numFindBuckets,numFindThreads>>>(d_bucketCount, d_kVals, d_markedBuckets, d_sums, d_bucketBounds, d_Kbounds, numNewSmallBuckets, numOldActive);
 
    //copy markedbuckets and sums back to host
-   CUDA_CALL(cudaMemcpy(markedBuckets, d_markedBuckets, 
+   CUDA_CALL(cudaMemcpy(h_markedBuckets, d_markedBuckets, 
                          numKs * sizeof(uint), cudaMemcpyDeviceToHost));
-   CUDA_CALL(cudaMemcpy(KthBucketScanner, d_sums, 
+   CUDA_CALL(cudaMemcpy(h_sums, d_sums, 
                          numKs * sizeof(uint), cudaMemcpyDeviceToHost));
 
+
+   //cleanup
+   cudaFree(d_kVals);
+   cudaFree(d_markedBuckets);
+   cudaFree(d_sums); 
+   cudaFree(d_Kbounds);
+
  } // end findKbucketsByBlock host function
+*/
+
 

@@ -117,6 +117,9 @@ compareMultiselect: $(CompareMultiselect)
 compareMultiselectNew2: $(CompareMultiselectNew2)
 	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
 
+compareMultiselectNewFindK: $(CompareMultiselectNewFindK)
+	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
+
 analyzeMultiselect: $(AnalyzeMultiselect)
 	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
 
