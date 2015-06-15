@@ -440,27 +440,27 @@ namespace BucketMultiselectNew2{
 
     if (threadIdx.x < 1) {
       int i, j = 0;
-      int firstBucket = numBuckets * blockIdx.x / numBlocks;
-      int lastBucket;
+      //int firstBucket = numBuckets * blockIdx.x / numBlocks;
+      //int lastBucket;
       blockOffset = oldReindexCounter[blockIdx.x];
       if (blockIdx.x + 1 < numBlocks) {
         elementsPerBlock = oldReindexCounter[blockIdx.x + 1] - blockOffset;
-        lastBucket = (int) (numBuckets * (blockIdx.x + 1) / numBlocks) - 1;
+        //lastBucket = (int) (numBuckets * (blockIdx.x + 1) / numBlocks) - 1;
       }
       else {
-        lastBucket = numBuckets - 1;
+        //lastBucket = numBuckets - 1;
         elementsPerBlock = length - blockOffset;
       }
       //printf ("block = %d, first = %d, last = %d\n", blockIdx.x, firstBucket, lastBucket);
-      for (i = 0; (d_uniqueBuckets[i] < firstBucket) && (i < numBlocks - 1); i++);
+      //for (i = 0; (d_uniqueBuckets[i] < firstBucket) && (i < numBlocks - 1); i++);
       // if (blockIdx.x == 98) printf ("i = %d, unique = %d\n", i, d_uniqueBuckets[i - 1]);
       // syncthreads();
-      while ((i < numBlocks) && (d_uniqueBuckets[i] <= lastBucket)) {
-        blockActiveBuckets[j] = d_uniqueBuckets[i];
-        i++;
-        j++;
-      } //end while
-      bucketsPerBlock = j;
+      // while ((i < numBlocks) && (d_uniqueBuckets[i] <= lastBucket)) {
+      //   blockActiveBuckets[j] = d_uniqueBuckets[i];
+      //   i++;
+      //   j++;
+      // } //end while
+      // bucketsPerBlock = j;
       // if (bucketsPerBlock > 1)
       //   printf ("block = %d, buckets = %d, bucket[0] = %d, bucket[1] = %d\n", blockIdx.x, bucketsPerBlock, blockActiveBuckets[0], blockActiveBuckets[1]);
       // blockActiveBuckets[bucketsPerBlock] = lastBucket + 1;
@@ -474,29 +474,30 @@ namespace BucketMultiselectNew2{
     for (int i = threadIdx.x; i < elementsPerBlock; i += blockDim.x) {
       uint index = i + blockOffset;
       temp = elementToBucket[index];
-      //printf ("block = %d, temp = %d, element = %f\n", blockIdx.x, temp, d_vector[index]);
+      printf ("block = %d, temp = %d, element = %f\n", blockIdx.x, temp, d_vector[index]);
       min = 0;
-      max = bucketsPerBlock;
+      //max = bucketsPerBlock;
+      max = numBuckets;
       //printf ("orig max = %d\n", max);
       compare = 0;  
-      for (int j = 1; j < bucketsPerBlock + 1; j *= 2) {
+      for (int j = 1; j < numBlocks + 1; j *= 2) {
         mid = (max + min) / 2;
-        compare = temp > blockActiveBuckets[mid];
+        //compare = temp > blockActiveBuckets[mid];
+        compare = temp > d_uniqueBuckets[mid];
         min = compare ? mid : min;
         max = compare ? max : mid;
       } //end for
-      // CHECK LAST BUCKET
-      if (max > 0 && threadIdx.x < 10) //temp == blockActiveBuckets[max])
-        printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
-      syncthreads();
-      if (temp == blockActiveBuckets[max]) {    
+      // if (max > 0 && threadIdx.x < 10) //temp == blockActiveBuckets[max])
+      //   printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
+      // syncthreads();
+      if (temp == d_uniqueBuckets[max]) {    
         // if (max > 0)
         //   printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
         //printf ("TRUE\n");
         int k = atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1;
         //newArray[atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1] = d_vector[index];
         newArray[k] = d_vector[index];
-        //printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
+        printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
         //newArray[blockIdx.x] = d_vector[index];
       } //end if
     } //end for
