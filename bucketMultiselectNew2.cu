@@ -452,15 +452,19 @@ namespace BucketMultiselectNew2{
         elementsPerBlock = length - blockOffset;
       }
       //printf ("block = %d, first = %d, last = %d\n", blockIdx.x, firstBucket, lastBucket);
-      for (i = 0; d_uniqueBuckets[i] < firstBucket; i++);
+      for (i = 0; (d_uniqueBuckets[i] < firstBucket) && (i < numBlocks - 1); i++);
+      // if (blockIdx.x == 98) printf ("i = %d, unique = %d\n", i, d_uniqueBuckets[i - 1]);
+      // syncthreads();
       while ((i < numBlocks) && (d_uniqueBuckets[i] <= lastBucket)) {
         blockActiveBuckets[j] = d_uniqueBuckets[i];
         i++;
         j++;
       } //end while
       bucketsPerBlock = j;
-      blockActiveBuckets[bucketsPerBlock]=lastBucket+1;
-      printf ("block = %d, offset = %u, bucketsPerBlock = %d, elementsPerBlock = %d\n", blockIdx.x, blockOffset, bucketsPerBlock, elementsPerBlock);
+      // if (bucketsPerBlock > 1)
+      //   printf ("block = %d, buckets = %d, bucket[0] = %d, bucket[1] = %d\n", blockIdx.x, bucketsPerBlock, blockActiveBuckets[0], blockActiveBuckets[1]);
+      // blockActiveBuckets[bucketsPerBlock] = lastBucket + 1;
+      //printf ("block = %d, offset = %u, bucketsPerBlock = %d, elementsPerBlock = %d\n", blockIdx.x, blockOffset, bucketsPerBlock, elementsPerBlock);
     } //end if (threadIdx.x < 1)
 
     syncthreads();
@@ -481,14 +485,18 @@ namespace BucketMultiselectNew2{
         min = compare ? mid : min;
         max = compare ? max : mid;
       } //end for
-      //printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
+      // CHECK LAST BUCKET
+      if (max > 0 && threadIdx.x < 10) //temp == blockActiveBuckets[max])
+        printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
+      syncthreads();
       if (temp == blockActiveBuckets[max]) {    
-        //printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
+        // if (max > 0)
+        //   printf ("block = %d, temp = %d, active = %d, max = %d\n", blockIdx.x, temp, blockActiveBuckets[max], max);
         //printf ("TRUE\n");
         int k = atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1;
         //newArray[atomicDec(d_bucketCount + temp + (numOldBlocks - 1) * numBuckets, length) - 1] = d_vector[index];
         newArray[k] = d_vector[index];
-        printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
+        //printf ("block = %d, bucket = %d, newArray[%d] = %f\n", blockIdx.x, temp, k, newArray[k]);
         //newArray[blockIdx.x] = d_vector[index];
       } //end if
     } //end for
@@ -535,8 +543,9 @@ namespace BucketMultiselectNew2{
     int loop = kListCount / MAX_THREADS_PER_BLOCK;
 
     for (int i = 0; i <= loop; i++) {      
-      if (idx < kListCount)
+      if (idx < kListCount) {
         *(outputVector + *(kIndices + idx)) = *(inputVector + *(kList + idx) - 1);
+      }
     }
   }
 
@@ -1148,6 +1157,7 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
         numUniqueBuckets++;
       }
       kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
+      printf ("kvals[%d] = %d\n", i, kVals[i]);
     }
 
     int newInputLengthAlt = reindexCounter[numUniqueBuckets-1] 
@@ -1197,14 +1207,21 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
     // for (int ii = 0; ii < newInputLengthAlt; ii++)
     //   printf ("newInputAlt[%d] = %f\n", ii, h_newInputAlt[ii]);
 
+    printf ("numNewActive = %d, numUniqueBuckets = %d\n", numNewActive, numUniqueBuckets);
     printf ("unique buckets: %d, elements: %d\n", numUniqueBuckets, newInputLengthAlt);
     copyElements_recursive<T><<<numNewActive, threadsPerBlock,
       numNewActive * sizeof(uint)>>>(newInput, newInputAlt, newInputLength, d_elementToBucket
                                      , numBuckets, numNewActive, d_bucketCount, d_oldReindexCounter, d_uniqueBuckets, numBlocks);
 
+    // T* h_newInput = (T*) malloc (newInputLengthAlt * sizeof (T));
+    // cudaMemcpy (h_newInput, newInputAlt, newInputLengthAlt * sizeof(T), cudaMemcpyDeviceToHost);
+    // for (int jj = 0; jj < newInputLengthAlt; jj++)
+    //   if (h_newInput[jj] > 1)
+    //     printf ("new[%d] = %f\n", jj, h_newInput[jj]);
+
     SAFEcuda("copyElements recurse");
 
-    //cudaThreadynchronize();
+    //cudaThreadSynchronize();
     
 
     cudaFree(d_pivots);
@@ -1223,9 +1240,11 @@ std::cout << "min[" << j << "]=" << h_mins[j] << "     slp[" << j << "]=" << h_s
 
     timing(0,7);
     //printf ("NEW LENGTH = %d\n", newInputLengthAlt);
+    
 
     sort_phase<T>(newInputAlt, newInputLengthAlt);
     SAFEcuda("sort_phase");
+
 
     T * d_output = (T *) d_elementToBucket;
     CUDA_CALL(cudaMemcpy (d_output, output, 
