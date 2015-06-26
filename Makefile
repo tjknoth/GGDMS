@@ -33,7 +33,8 @@ PROGRAMS = \
 compareMultiselect \
 analyzeMultiselect \
 realDataTests \
-compareMultiselectNew2
+compareMultiselectNew2 \
+compareMultiselectNewFindK
 
 SMOS = \
 SMOStimingsOSDistrAll \
