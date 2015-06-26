@@ -1,3 +1,5 @@
+// -*- c++ -*-
+
 /* Based on timingFunctions.cu */
 #include <stdlib.h>
 
