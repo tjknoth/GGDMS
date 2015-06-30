@@ -1,3 +1,5 @@
+// -*- c++ -*-
+
   template<typename T>
   void mmsetToAllZero (T * d_vector, int length) {
     cudaMemset(d_vector, 0, length * sizeof(T));

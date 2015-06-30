@@ -2,7 +2,7 @@
 
 /* Based on timingFunctions.cu */
 #include <stdlib.h>
-
+#include <mpi.h>
 
 #ifndef GPUNUMBER
   #define GPUNUMBER 0
@@ -13,7 +13,6 @@
 #define CUDA_CALL(x) do { if((x) != cudaSuccess) {    \
       printf("Error at %s:%d\n",__FILE__,__LINE__);     \
       return EXIT_FAILURE;}} while(0)
-
 
 
 template <typename T>
@@ -72,7 +71,7 @@ inline void bestSort<double>(double * d_vec, const uint numElements) {
 
 
 template<typename T>
-results_t<T>* timeSortAndChooseMultiselect(T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeSortAndChooseMultiselect_a(T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -121,7 +120,7 @@ results_t<T>* timeSortAndChooseMultiselect(T * h_vec, uint numElements, uint * k
 
 
 template<typename T>
-results_t<T>* timeBucketMultiselect (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeBucketMultiselect_a (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -148,13 +147,15 @@ results_t<T>* timeBucketMultiselect (T * h_vec, uint numElements, uint * kVals, 
 
 
 template<typename T>
-results_t<T>* timeBucketMultiselectNewFindK (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeBucketMultiselectNewFindK_ba (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
   cudaEvent_t start, stop;
   cudaDeviceProp dp;
   cudaGetDeviceProperties(&dp, GPUNUMBER);
+
+  printf ("timing on processor %d\n", world_rank);
 
   // If world_rank == 0
   setupForTiming(start, stop, h_vec, &d_vec, &result, numElements, kCount);
@@ -183,7 +184,7 @@ results_t<T>* timeBucketMultiselectNewFindK (T * h_vec, uint numElements, uint *
 
 // FUNCTION TO TIME CPU Based QUICKMULTISELECT
 template<typename T>
-results_t<T>* timeQuickMultiselect (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeQuickMultiselect (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   T * h_vec_copy;
   h_vec_copy = (T *) malloc(sizeof(T)*numElements);
@@ -218,7 +219,7 @@ results_t<T>* timeQuickMultiselect (T * h_vec, uint numElements, uint * kVals, u
 
 // FUNCTION TO TIME SORT&CHOOSE WITH CUB RADIX SORT
 template<typename T>
-results_t<T>* timeCUBSortAndChooseMultiselect(T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeCUBSortAndChooseMultiselect(T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -262,7 +263,7 @@ results_t<T>* timeCUBSortAndChooseMultiselect(T * h_vec, uint numElements, uint 
 
 //FUNCTION TO TIME ModernGPU Sort and Choose 
 template<typename T>
-results_t<T>* timeMGPUSortAndChooseMultiselect(T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeMGPUSortAndChooseMultiselect(T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -310,7 +311,7 @@ results_t<T>* timeMGPUSortAndChooseMultiselect(T * h_vec, uint numElements, uint
 
 // FUNCTION TO TIME CUB BUCKET MULTISELECT
 template<typename T>
-results_t<T>* timeBucketMultiselect_cub (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeBucketMultiselect_cub (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -337,7 +338,7 @@ results_t<T>* timeBucketMultiselect_cub (T * h_vec, uint numElements, uint * kVa
 
 // FUNCTION TO TIME MGPU BUCKET MULTISELECT
 template<typename T>
-results_t<T>* timeBucketMultiselect_mgpu (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeBucketMultiselect_mgpu (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -365,7 +366,7 @@ results_t<T>* timeBucketMultiselect_mgpu (T * h_vec, uint numElements, uint * kV
 // FUNCTION TO TIME THRUST BUCKET MULTISELECT
 // This is the original function; it does not use binary search trees.
 template<typename T>
-results_t<T>* timeBucketMultiselect_thrust (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeBucketMultiselect_thrust (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -392,7 +393,7 @@ results_t<T>* timeBucketMultiselect_thrust (T * h_vec, uint numElements, uint * 
 
 // FUNCTION TO TIME NAIVE BUCKET MULTISELECT (Does not use kernel density estimator nor binary search trees; not recommended)
 template<typename T>
-results_t<T>* timeNaiveBucketMultiselect (T * h_vec, uint numElements, uint * kVals, uint kCount) {
+results_t<T>* timeNaiveBucketMultiselect (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -422,7 +423,7 @@ results_t<T>* timeNaiveBucketMultiselect (T * h_vec, uint numElements, uint * kV
 ****************************************/
 
 template<typename T>
-results_t<T>* timeSortAndChooseTopkselect(T * h_vec, uint numElements, uint kCount) {
+results_t<T>* timeSortAndChooseTopkselect(T * h_vec, uint numElements, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -446,7 +447,7 @@ results_t<T>* timeSortAndChooseTopkselect(T * h_vec, uint numElements, uint kCou
 
 // FUNCTION TO TIME RANDOMIZED TOP K SELECT
 template<typename T>
-results_t<T>* timeRandomizedTopkselect (T * h_vec, uint numElements, uint kCount) {
+results_t<T>* timeRandomizedTopkselect (T * h_vec, uint numElements, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -470,7 +471,7 @@ results_t<T>* timeRandomizedTopkselect (T * h_vec, uint numElements, uint kCount
 
 // FUNCTION TO TIME BUCKET TOP K SELECT
 template<typename T>
-results_t<T>* timeBucketTopkselect (T * h_vec, uint numElements, uint kCount) {
+results_t<T>* timeBucketTopkselect (T * h_vec, uint numElements, uint kCount, int world_rank, int world_size, char* processor_name) {
   // initialize ks
   uint * kVals = (uint *) malloc(kCount*sizeof(T));
   for (uint i = 0; i < kCount; i++)

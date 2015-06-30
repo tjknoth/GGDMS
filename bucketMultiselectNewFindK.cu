@@ -22,6 +22,7 @@
 #include <thrust/sort.h>
 #include <thrust/transform_reduce.h>
 #include <limits>
+#include <mpi.h>
 
 #include <math.h>
 #include <ctime>
@@ -110,7 +111,7 @@ namespace BucketMultiselectNewFindK{
   }
 
 
-/*
+  /*
 *********************************************************
 */
 
@@ -305,7 +306,7 @@ namespace BucketMultiselectNewFindK{
      reduced vector space.
      newArray - reduced size vector containing the essential elements
      *** This function is not used in current implementation, replaced by copyElements_tree. ***
-  */
+     */
   template <typename T>
   __global__ void copyElements (T* d_vector, int length, uint* elementToBucket
                                 , uint * buckets, const int numBuckets, T* newArray, uint offset
@@ -916,7 +917,7 @@ namespace BucketMultiselectNewFindK{
     CUDA_CALL(cudaMalloc(&d_uniqueBuckets, numKs * sizeof(uint)));
 
     CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
-                        numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+                         numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
 
@@ -928,7 +929,7 @@ namespace BucketMultiselectNewFindK{
     timing(1,4);
     /// ***********************************************************
     /// **** STEP 5: Reduce 
-    /// **** Copy the elements from the unique acitve buckets
+    /// **** Copy the elements from the unique active buckets
     /// **** to a new vector 
     /// ***********************************************************
     timing(0,5);
@@ -972,10 +973,10 @@ namespace BucketMultiselectNewFindK{
     // I'm not sure if new Minimums needs to be double or not.
     // if not, we can also declare old minimums and use d_pivots
     double * d_newMinimums;
-//    T * d_newMinimums;
+    //    T * d_newMinimums;
     double * d_newSlopes, *d_oldSlopes;
     CUDA_CALL(cudaMalloc(&d_newMinimums, numKs * sizeof(double)));
-//    CUDA_CALL(cudaMalloc(&d_newMinimums, numNewActive * sizeof(T)));
+    //    CUDA_CALL(cudaMalloc(&d_newMinimums, numNewActive * sizeof(T)));
     CUDA_CALL(cudaMalloc(&d_newSlopes, numKs * sizeof(double)));
     d_oldSlopes = d_slopes;
 
@@ -992,13 +993,13 @@ namespace BucketMultiselectNewFindK{
 
     int reacreateThreads = 128;
 
-// *****************************************************
-// Here seems to be where we begin the recursion
-// *****************************************************
+    // *****************************************************
+    // Here seems to be where we begin the recursion
+    // *****************************************************
 
     // determine the number of buckets per new block
     newNumSmallBuckets = numBlocks*numBuckets/numNewActive;
-//    newNumSmallBuckets = numBuckets/numNewActive;
+    //    newNumSmallBuckets = numBuckets/numNewActive;
 
     CUDA_CALL(cudaMemcpy (d_kVals, kVals, numKs * sizeof (uint), cudaMemcpyHostToDevice));
 
@@ -1008,8 +1009,8 @@ namespace BucketMultiselectNewFindK{
 
     recreateBuckets<T><<<recreateBlocks, reacreateThreads
       , numOldActive*sizeof(double)*2>>>(d_uniqueBuckets, d_newSlopes, d_newMinimums
-                                                     , numNewActive, d_oldSlopes, d_pivots, numOldActive
-                                                     , oldNumSmallBuckets, newNumSmallBuckets);
+                                         , numNewActive, d_oldSlopes, d_pivots, numOldActive
+                                         , oldNumSmallBuckets, newNumSmallBuckets);
 
     cudaDeviceSynchronize();
     SAFEcuda("recreateBuckets");
@@ -1030,41 +1031,43 @@ namespace BucketMultiselectNewFindK{
 
     cudaThreadSynchronize();
     
-//    timing(1,6);
+    //    timing(1,6);
      
     SAFEcuda("pre findKBuckets");
 
 
-// compute Kbounds and copy to device
-   uint blockOffset;
-   uint Kbounds[numKs+1];
-   Kbounds[0]=0;
-   uint j = 0;
-   uint i = 1;
-   uint k = kVals[j];
-   while (i < numOldActive) {
-     blockOffset = reindexCounter[i];  // in recursion, we need to copy from the d_reindexsums
-     while ( (k <= blockOffset) && (j < numKs) ) {
-       j++;
-       k = kVals[j];
-     }
-     Kbounds[i]=j;
-     i++;
-   }
-   Kbounds[numOldActive]=numKs;
+    // compute Kbounds and copy to device
+    uint blockOffset;
+    uint Kbounds[numKs+1];
+    Kbounds[0]=0;
+    uint j = 0;
+    uint i = 1;
+    uint k = kVals[j];
+    while (i < numOldActive) {
+      blockOffset = reindexCounter[i];  // in recursion, we need to copy from the d_reindexsums
+      while ( (k <= blockOffset) && (j < numKs) ) {
+        j++;
+        k = kVals[j];
+      }
+      Kbounds[i]=j;
+      i++;
+    }
+    Kbounds[numOldActive]=numKs;
 
-   CUDA_CALL(cudaMemcpy(d_Kbounds, Kbounds, 
+    CUDA_CALL(cudaMemcpy(d_Kbounds, Kbounds, 
                          (numOldActive+1) * sizeof(uint), cudaMemcpyHostToDevice));
-// *******************************
+    // *******************************
 
-     newInputLengthAlt = findKbucketsByBlock (d_bucketCount, d_oldReindexCounter, d_Kbounds, d_reindexCounter, d_sums, d_kVals, d_markedBucketFlags, d_numUniquePerBlock, d_uniqueBuckets, &numNewActive, numOldActive, newNumSmallBuckets, numKs);
+    newInputLengthAlt = findKbucketsByBlock (d_bucketCount, d_oldReindexCounter, d_Kbounds, d_reindexCounter
+                                             , d_sums, d_kVals, d_markedBucketFlags, d_numUniquePerBlock
+                                             , d_uniqueBuckets, &numNewActive, numOldActive, newNumSmallBuckets, numKs);
 
     cudaThreadSynchronize();
 
 
     CUDA_CALL(cudaMemcpy(uniqueBuckets, d_uniqueBuckets, 
                          numNewActive * sizeof(uint), cudaMemcpyDeviceToHost));
-//    for (int i=0; i<numNewActive; i++) printf("active[%d]=%d\n",i,uniqueBuckets[i]);
+    //    for (int i=0; i<numNewActive; i++) printf("active[%d]=%d\n",i,uniqueBuckets[i]);
 
     SAFEcuda("findKBucketsByBlock");
 
@@ -1072,7 +1075,8 @@ namespace BucketMultiselectNewFindK{
 
     cudaThreadSynchronize();
     
-    int reducedlength = Reduction<T>(newInput, newInputAlt, d_elementToBucket, d_uniqueBuckets, d_oldReindexCounter, d_numUniquePerBlock, newInputLength, numOldActive, numNewActive);
+    int reducedlength = Reduction<T>(newInput, newInputAlt, d_elementToBucket, d_uniqueBuckets, d_oldReindexCounter
+                                     , d_numUniquePerBlock, newInputLength, numOldActive, numNewActive);
 
 
 

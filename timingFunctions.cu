@@ -1,3 +1,5 @@
+// -*- c++ -*-
+
 /* Copyright 2011 Russel Steinbach, Jeffrey Blanchard, Bradley Gordon,
  *   and Toluwaloju Alabi
  *   Licensed under the Apache License, Version 2.0 (the "License");
