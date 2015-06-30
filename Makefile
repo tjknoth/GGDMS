@@ -8,10 +8,11 @@ NVCC := nvcc #-ccbin /usr/bin
 .SUFFIXES: .c .cpp .cu .o
 
 # Includes
-INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I./lib/ -I./moderngpu/include
+INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I./lib/ -I./moderngpu/include -I/usr/include/openmpi
 # Libraries
 LIB_CUDA := -L$(CUDA_INSTALL_PATH)/lib64 -lcurand -lcudart
 # LIB_CUDA := -L$(CUDA_INSTALL_PATH)/lib -lcurand -lm -lgsl -lgslcblas
+LIB_MPI := -L/usr/lib/openmpi -lmpi
 # ARCH
 ARCH = -arch=sm_20
 # dynamic parallelism
@@ -24,6 +25,7 @@ CDP = -DCUB_CDP
 NVCCFLAGS += $(COMMONFLAGS)
 NVCCFLAGS += $(ARCH)
 NVCCFLAGS += $(LIB_CUDA)
+NVCCFLAGS += $(LIB_MPI)
 CXXFLAGS += $(COMMONFLAGS)
 CFLAGS += $(COMMONFLAGS)
 
@@ -175,5 +177,6 @@ clean:
 
 cleanSMOS:
 	rm -rf $(SMOS) *~ *.o
+
 
 
