@@ -37,9 +37,9 @@
 #include "bucketMultiselect.cu"
 //#include "bucketMultiselectNew2.cu"
 #include "bucketMultiselectNewFindK.cu"
-//#include "bucketMultiselect_thrust.cu"
-//#include "bucketMultiselect_cub.cu"
-//#include "bucketMultiselect_mgpu.cu"
+#include "bucketMultiselect_thrust.cu"
+#include "bucketMultiselect_cub.cu"
+#include "bucketMultiselect_mgpu.cu"
 //#include "naiveBucketMultiselect.cu"
 
 #include "generateProblems.cu"
@@ -73,7 +73,7 @@ namespace CompareMultiselectNewFindK {
     ofstream fileCsv;
     timeval t1;
  
-    typedef results_t<T>* (*ptrToTimingFunction)(T*, uint, uint *, uint);
+    typedef results_t<T>* (*ptrToTimingFunction)(T*, uint, uint *, uint, int, int, char*);
     typedef void (*ptrToGeneratingFunction)(T*, uint, curandGenerator_t);
 
     //these are the functions that can be called
@@ -136,8 +136,10 @@ namespace CompareMultiselectNewFindK {
 
       curandCreateGenerator(&generator, CURAND_RNG_PSEUDO_DEFAULT);
       curandSetPseudoRandomGeneratorSeed(generator,seed);
-      printf("Running test %u of %u for size: %u and numK: %u\n", i + 1, 
-             numTests, size, numKs);
+      if (world_rank == 0) {
+        printf("Running test %u of %u for size: %u and numK: %u\n", i + 1, 
+               numTests, size, numKs);
+      }
 
       // Use the root process to randomly generate the data set
       if (world_rank == 0) {
@@ -154,8 +156,8 @@ namespace CompareMultiselectNewFindK {
       //Scatter h_vec_copy
       int* sendcounts;
       int offset = (int) size / world_size;
-      for (int i = 0; i < world_size - 1; i++)
-        sendcounts[i] = offset;
+      for (int ii = 0; ii < world_size - 1; ii++)
+        sendcounts[ii] = offset;
       sendcounts[world_size - 1] = size - (world_size - 1) * offset;
       int newSize = sendcounts[world_rank];
       T* h_vecChunk = (T*) malloc (newSize * sizeof(T));

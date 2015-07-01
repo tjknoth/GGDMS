@@ -26,7 +26,7 @@
 
 #include <math.h>
 #include <ctime>
-//#include "recursionKernels.cu"
+#include "recursionKernels.cu"
 #include "findk.cu"
 
 
@@ -991,7 +991,7 @@ namespace BucketMultiselectNewFindK{
     oldNumSmallBuckets = numBuckets/numOldActive;
 
 
-    int reacreateThreads = 128;
+    int recreateThreads = 128;
 
     // *****************************************************
     // Here seems to be where we begin the recursion
@@ -1003,11 +1003,11 @@ namespace BucketMultiselectNewFindK{
 
     CUDA_CALL(cudaMemcpy (d_kVals, kVals, numKs * sizeof (uint), cudaMemcpyHostToDevice));
 
-    int recreateBlocks = numNewActive/reacreateThreads + 1;
+    int recreateBlocks = numNewActive/recreateThreads + 1;
 
     // Recreate sub-buckets
 
-    recreateBuckets<T><<<recreateBlocks, reacreateThreads
+    recreateBuckets<T><<<recreateBlocks, recreateThreads
       , numOldActive*sizeof(double)*2>>>(d_uniqueBuckets, d_newSlopes, d_newMinimums
                                          , numNewActive, d_oldSlopes, d_pivots, numOldActive
                                          , oldNumSmallBuckets, newNumSmallBuckets);

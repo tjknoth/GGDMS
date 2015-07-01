@@ -147,7 +147,7 @@ results_t<T>* timeBucketMultiselect_a (T * h_vec, uint numElements, uint * kVals
 
 
 template<typename T>
-results_t<T>* timeBucketMultiselectNewFindK_ba (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
+results_t<T>* timeBucketMultiselectNewFindK_a (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
   T * d_vec;
   results_t<T> * result;
   float time;

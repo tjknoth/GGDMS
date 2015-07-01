@@ -65,7 +65,7 @@ CompareMultiselectNewFindK = \
 compareMultiselectNewFindK.cu \
 bucketMultiselectNewFindK.cu naiveBucketMultiselect.cu \
 bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
-generateProblems.cu multiselectTimingFunctionsNew2.cu \
+generateProblems.cu multiselectTimingFunctionsNewFindK.cu \
 recursionKernels.cu findk.cu 
 
 AnalyzeMultiselect = \
