@@ -155,7 +155,7 @@ results_t<T>* timeBucketMultiselectNewFindK_a (T * h_vec, uint numElements, uint
   cudaDeviceProp dp;
   cudaGetDeviceProperties(&dp, GPUNUMBER);
 
-  printf ("timing on processor %d\n", world_rank);
+  printf ("timing on processor %d. numElements = %u, kCount = %u\n", world_rank, numElements, kCount);
 
   // If world_rank == 0
   setupForTiming(start, stop, h_vec, &d_vec, &result, numElements, kCount);
@@ -164,7 +164,7 @@ results_t<T>* timeBucketMultiselectNewFindK_a (T * h_vec, uint numElements, uint
   cudaEventRecord(start, 0);
 
   // bucketMultiselectWrapper (T * d_vector, int length, uint * kVals_ori, uint kCount, T * outputs, int blocks, int threads)
-  BucketMultiselectNewFindK::bucketMultiselectWrapper(d_vec, numElements, kVals, kCount, result->vals, dp.multiProcessorCount, dp.maxThreadsPerBlock);
+  BucketMultiselectNewFindK::bucketMultiselectWrapper(d_vec, numElements, kVals, kCount, result->vals, dp.multiProcessorCount, dp.maxThreadsPerBlock, world_rank, world_size, processor_name);
  
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);

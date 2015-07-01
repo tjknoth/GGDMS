@@ -125,11 +125,19 @@ namespace CompareMultiselectNewFindK {
     for(i = 0; i < numTests; i++) {
       gettimeofday(&t1, NULL);
       seed = t1.tv_usec * t1.tv_sec;
+      
+      if (world_rank == 0) {
+        for(m = 0; m < NUMBEROFALGORITHMS;m++)
+          runOrder[m] = m;
     
-      for(m = 0; m < NUMBEROFALGORITHMS;m++)
-        runOrder[m] = m;
-    
-      std::random_shuffle(runOrder, runOrder + NUMBEROFALGORITHMS);
+        std::random_shuffle(runOrder, runOrder + NUMBEROFALGORITHMS);
+        // Send out random run order so all processes run together.
+        for (int jj = 1; jj < world_size; jj++)
+          MPI_Send(runOrder, NUMBEROFALGORITHMS, MPI_INT, jj, 0, MPI_COMM_WORLD);
+      }
+      // Receive random run order
+      else 
+        MPI_Recv(runOrder, NUMBEROFALGORITHMS, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       fileCsv << size << "," << numKs << "," << 
         namesOfGeneratingFunctions[generateType] << "," << 
         namesOfKGenerators[kGenerateType] << ",";
@@ -162,6 +170,8 @@ namespace CompareMultiselectNewFindK {
       int newSize = sendcounts[world_rank];
       T* h_vecChunk = (T*) malloc (newSize * sizeof(T));
 
+      MPI_Barrier(MPI_COMM_WORLD);
+
       winnerArray[i] = 0;
       float currentWinningTime = INFINITY;
       //run the various timing functions
@@ -170,80 +180,95 @@ namespace CompareMultiselectNewFindK {
         if(algorithmsToTest[j]){
 
           //run timing function j. If it is the distributed multiselect, use different arguments.
-          printf("TESTING: %u\n", j);
+          printf("TESTING: %u on processor rank %d of %d, named %s\n", j, world_rank, world_size, processor_name);
           if (j == 2)
             temp = arrayOfTimingFunctions[j](h_vecChunk, newSize, kVals, numKs, world_rank, world_size, processor_name);
-          else
+          else if (world_rank == 0) {
             temp = arrayOfTimingFunctions[j](h_vec_copy, size, kVals, numKs, world_rank, world_size, processor_name);
+            //printf ("finished on %s\n", processor_name);
+          }
 
-          //record the time result
-          timeArray[j][i] = temp->time;
-          //record the value returned
-          resultsArray[j][i] = temp->vals;
-          //update the current "winner" if necessary
-          if(timeArray[j][i] < currentWinningTime){
-            currentWinningTime = temp->time;
-            winnerArray[i] = j;
+          if (world_rank == 0) {
+            //record the time result
+            timeArray[j][i] = temp->time;
+            //record the value returned
+            resultsArray[j][i] = temp->vals;
+            //update the current "winner" if necessary
+            if(timeArray[j][i] < currentWinningTime){
+              currentWinningTime = temp->time;
+              winnerArray[i] = j;
+            }
+            //printf ("successful on %s\n", processor_name);
           }
 
           //perform clean up 
-          free(temp);
-          memcpy(h_vec_copy, h_vec, size * sizeof(T));
+          if (world_rank == 0 && x != 2) {
+            free (temp);
+            memcpy(h_vec_copy, h_vec, size * sizeof(T));
+          }
         }
+        MPI_Barrier(MPI_COMM_WORLD);
       }
 
       curandDestroyGenerator(generator);
-      for(x = 0; x < NUMBEROFALGORITHMS; x++)
-        if(algorithmsToTest[x])
-          fileCsv << namesOfMultiselectTimingFunctions[x] << "," << timeArray[x][i] << ",";
+      if (world_rank == 0) {
+        for(x = 0; x < NUMBEROFALGORITHMS; x++)
+          if(algorithmsToTest[x])
+            fileCsv << namesOfMultiselectTimingFunctions[x] << "," << timeArray[x][i] << ",";
+      }
 
-      // check for errors, and output information to recreate problem
-      uint flag = 0;
-      for(m = 1; m < NUMBEROFALGORITHMS;m++)
-        if(algorithmsToTest[m])
-          for (j = 0; j < numKs; j++) {
-            if(resultsArray[m][i][j] != resultsArray[0][i][j]) {
-              flag++;
-              fileCsv << "\nERROR ON TEST " << i << " of " << numTests << " tests!!!!!\n";
-              fileCsv << "vector size = " << size << "\nvector seed = " << seed << "\n";
-              fileCsv << "numKs = " << numKs << "\n";
-              fileCsv << "wrong k = " << kVals[j] << " kIndex = " << j << 
-                " wrong result = " << resultsArray[m][i][j] << " correct result = " <<  
-                resultsArray[0][i][j] << "\n";
-              std::cout <<namesOfMultiselectTimingFunctions[m] <<
-                " did not return the correct answer on test " << i + 1 << " at k[" << j << 
-                "].  It got "<< resultsArray[m][i][j];
-              std::cout << " instead of " << resultsArray[0][i][j] << ".\n" ;
-              std::cout << "RESULT:\t";
-              PrintFunctions::printBinary(resultsArray[m][i][j]);
-              std::cout << "Right:\t";
-              PrintFunctions::printBinary(resultsArray[0][i][j]);
+      printf ("MORE successful on %s\n", processor_name);
+
+      if (world_rank == 0) {
+        // check for errors, and output information to recreate problem
+        uint flag = 0;
+        for(m = 1; m < NUMBEROFALGORITHMS;m++)
+          if(algorithmsToTest[m])
+            for (j = 0; j < numKs; j++) {
+              if(resultsArray[m][i][j] != resultsArray[0][i][j]) {
+                flag++;
+                fileCsv << "\nERROR ON TEST " << i << " of " << numTests << " tests!!!!!\n";
+                fileCsv << "vector size = " << size << "\nvector seed = " << seed << "\n";
+                fileCsv << "numKs = " << numKs << "\n";
+                fileCsv << "wrong k = " << kVals[j] << " kIndex = " << j << 
+                  " wrong result = " << resultsArray[m][i][j] << " correct result = " <<  
+                  resultsArray[0][i][j] << "\n";
+                std::cout <<namesOfMultiselectTimingFunctions[m] <<
+                  " did not return the correct answer on test " << i + 1 << " at k[" << j << 
+                  "].  It got "<< resultsArray[m][i][j];
+                std::cout << " instead of " << resultsArray[0][i][j] << ".\n" ;
+                std::cout << "RESULT:\t";
+                PrintFunctions::printBinary(resultsArray[m][i][j]);
+                std::cout << "Right:\t";
+                PrintFunctions::printBinary(resultsArray[0][i][j]);
+              }
             }
-          }
 
-      fileCsv << flag << "\n";
-    }
+        fileCsv << flag << "\n";
+      }
+ 
   
-    //calculate the total time each algorithm took
-    for(i = 0; i < numTests; i++)
-      for(j = 0; j < NUMBEROFALGORITHMS;j++)
-        if(algorithmsToTest[j])
-          totalTimesPerAlgorithm[j] += timeArray[j][i];
+      //calculate the total time each algorithm took
+      for(i = 0; i < numTests; i++)
+        for(j = 0; j < NUMBEROFALGORITHMS;j++)
+          if(algorithmsToTest[j])
+            totalTimesPerAlgorithm[j] += timeArray[j][i];
 
-    //count the number of times each algorithm won. 
-    for(i = 0; i < numTests;i++)
-      timesWon[winnerArray[i]]++;
+      //count the number of times each algorithm won. 
+      for(i = 0; i < numTests;i++)
+        timesWon[winnerArray[i]]++;
 
-    printf("\n\n");
+      printf("\n\n");
 
-    //print out the average times
-    for(i = 0; i < NUMBEROFALGORITHMS; i++)
-      if(algorithmsToTest[i])
-        printf("%-20s averaged: %f ms\n", namesOfMultiselectTimingFunctions[i], totalTimesPerAlgorithm[i] / numTests);
+      //print out the average times
+      for(i = 0; i < NUMBEROFALGORITHMS; i++)
+        if(algorithmsToTest[i])
+          printf("%-20s averaged: %f ms\n", namesOfMultiselectTimingFunctions[i], totalTimesPerAlgorithm[i] / numTests);
 
-    for(i = 0; i < NUMBEROFALGORITHMS; i++)
-      if(algorithmsToTest[i])
-        printf("%s won %u times\n", namesOfMultiselectTimingFunctions[i], timesWon[i]);
+      for(i = 0; i < NUMBEROFALGORITHMS; i++)
+        if(algorithmsToTest[i])
+          printf("%s won %u times\n", namesOfMultiselectTimingFunctions[i], timesWon[i]);
+    }
 
     // free results
     for(i = 0; i < numTests; i++) 

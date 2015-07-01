@@ -23,6 +23,7 @@
 #include <thrust/transform_reduce.h>
 #include <limits>
 #include <mpi.h>
+#include <boost/mpi/datatype.hpp>
 
 #include <math.h>
 #include <ctime>
@@ -690,7 +691,7 @@ namespace BucketMultiselectNewFindK{
   */
   template <typename T>
   T bucketMultiSelect (T* d_vector, int length, uint * kVals, int numKs, T * output, int blocks
-                       , int threads, int numBuckets, int numPivots) {    
+                       , int threads, int numBuckets, int numPivots, int world_rank, int world_size, char* processor_name) {    
 
     //CUDA_CALL(cudaDeviceReset());
 
@@ -701,7 +702,7 @@ namespace BucketMultiselectNewFindK{
     /// ***********************************************************
     timing(0,1);
 
-
+    // SHOULD THIS HAPPEN DISTRIBUTED?
 
     //find max and min with thrust
     T maximum, minimum;
@@ -836,16 +837,26 @@ namespace BucketMultiselectNewFindK{
     CUDA_CALL(cudaMalloc(&d_pivots, slopesize * sizeof(T)));
     CUDA_CALL(cudaMalloc(&d_pivottree, numPivots * sizeof(T)));
 
-    // Find bucket sizes using a randomized selection
-    generatePivots<T>(pivots, pivottree, slopes, d_vector, length, numPivots, sampleSize, 
-                      numBuckets, minimum, maximum);
-    SAFEcuda("generatePivots");
-    // make any slopes that were infinity due to division by zero (due to no 
-    //  difference between the two associated pivots) into zero, so all the
-    //  values which use that slope are projected into a single bucket
-    for (register int i = 0; i < numPivots - 1; i++)
-      if (isinf(slopes[i]))
-        slopes[i] = 0;
+    if (world_rank == 0) {
+      // Find bucket sizes using a randomized selection
+      generatePivots<T>(pivots, pivottree, slopes, d_vector, length, numPivots, sampleSize, 
+                        numBuckets, minimum, maximum);
+      SAFEcuda("generatePivots");
+      // make any slopes that were infinity due to division by zero (due to no 
+      //  difference between the two associated pivots) into zero, so all the
+      //  values which use that slope are projected into a single bucket
+      for (register int i = 0; i < numPivots - 1; i++)
+        if (isinf(slopes[i]))
+          slopes[i] = 0;
+
+      for (int i = 1; i < world_size; i++) {
+        MPI_Send(slopes, numPivots, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+        MPI_Send(pivots, numPivots, get_mpi_datatype(&pivots), i, 0, MPI_COMM_WORLD); // pivots
+        MPI_Send(pivottree, numPivots, get_mpi_datatype(&pivots), i, 0, MPI_COMM_WORLD); // pivot tree
+      }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // for(int i=0;i<numPivots-1;i++){
     //   printf("\n 3 Slope: %lf \n",slopes[i]);
@@ -1151,7 +1162,8 @@ namespace BucketMultiselectNewFindK{
    */
   template <typename T>
   T bucketMultiselectWrapper (T * d_vector, int length, uint * kVals_ori, int numKs
-                              , T * outputs, int blocks, int threads) { 
+                              , T * outputs, int blocks, int threads, int world_rank
+                              , int world_size, char* processor_name) { 
 
     int numBuckets = 8192;
     uint kVals[numKs];
@@ -1160,7 +1172,7 @@ namespace BucketMultiselectNewFindK{
     for (register int i = 0; i < numKs; i++) 
       kVals[i] = length - kVals_ori[i] + 1;
    
-    bucketMultiSelect<T> (d_vector, length, kVals, numKs, outputs, blocks, threads, numBuckets, 17);
+    bucketMultiSelect<T> (d_vector, length, kVals, numKs, outputs, blocks, threads, numBuckets, 17, world_rank, world_size, processor_name);
 
     return 1;
   }
