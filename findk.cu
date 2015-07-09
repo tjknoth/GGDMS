@@ -3,11 +3,42 @@
     cudaMemset(d_vector, 0, length * sizeof(T));
   }
 
+void printDevice(uint * d_reindexSums, uint * d_sums, int numKs){
+	for (int i = 0; i < numKs; i ++){
+		printf("reindexSum[%d] = %u \t sum[%d] = %u \n",i,d_reindexSums[i],i,d_sums[i]);
+	}
+}
+
 
 /*
  * This device function will be called by a kernel with each thread finding the 
  * k buckets for each oldActiveBucket (i.e. each block used to reassign buckets) 
 */
+
+__global__ void	printActive(uint * d_uniqueBuckets, int numActive){
+	if(threadIdx.x + blockIdx.x == 0) {
+		printf("\n ************************ \n");
+		printf("numNewActive: %d",numActive);
+		for (int i = 0; i < numActive; i ++){
+			printf("uniqueBuckets[%d] = %u\n",i,d_uniqueBuckets[i]);
+		}
+		printf("\n ************************ \n");
+	}
+}
+
+
+__device__ void correctBlocks(int blockNumKs){
+
+	if(blockNumKs > 1) {
+		int i = 0;
+		int j = 0;
+		
+	}
+
+}
+
+
+
 __device__ uint d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint * markedBuckets, 
                                     uint * sums, uint * reindexsums, const int numNewSmallBuckets, 
                                     const int blockBucketOffset, const int blockStart,  
@@ -21,6 +52,7 @@ __device__ uint d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint *
     int numUniqueBlock=1;
     markedBucketFlags[blockKsOffset] = 1;
 
+
     // find the buckets which contain the kVals
     for(register int i = 0; i < blockNumKs; i++) {
       k = kVals[blockKsOffset + i];
@@ -30,6 +62,7 @@ __device__ uint d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint *
         kBucket++;
       } // end while
       markedBuckets[blockKsOffset + i] = kBucket-1;
+			//printf("markedBuckets[%d] = %d\n",blockKsOffset + i,markedBuckets[blockKsOffset + i]);
       sums[blockKsOffset + i] = sum - temp; 
       reindexsums[blockKsOffset + i] = temp; 
 
@@ -63,17 +96,47 @@ __device__ uint d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint *
 */
 __global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals, uint * d_markedBuckets, uint * d_sums, uint * d_reindexsums, uint * d_bucketBounds, uint * d_KBounds, const int numNewSmallBuckets, const int numOldActive, const int numKs, uint * numUniquePerBlock, uint * markedBucketFlags)
  {
+
    int index = blockDim.x * blockIdx.x + threadIdx.x;
    int blockKsOffset, blockNumKs;
-   if (index < numOldActive) {
+/*
+   if (index < numOldActive + 1) {
+		  deviceTag(2);
      blockKsOffset = d_KBounds[index];
+		//printf("blockKsOffset %d\n",blockKsOffset);			
      blockNumKs = d_KBounds[index+1] - blockKsOffset;
-     if (index+1 == numOldActive) blockNumKs = numKs - blockKsOffset;  // potentially unnecessary based on kBounds
+*/
+   if (index < numOldActive) {
+
+     blockKsOffset = d_KBounds[index];
+		//printf("blockKsOffset %d\n",blockKsOffset);
+     if (index + 1 < numOldActive) {			
+       blockNumKs = d_KBounds[index+1] - blockKsOffset;
+
+     } else {
+       blockNumKs = numKs - blockKsOffset;
+
+     }
+			if (blockNumKs > 1) {
+			printf("index = %d \t blockNumKs = %d\n",index,blockNumKs);
+			printf("bucketBounds[%d] = %u\n bucketBounds[%d] = %u\n\n",index,d_reindexsums[index],index + 1,d_reindexsums[index + 1]);
+     }
+
+		syncthreads();
+/*
+     if (index+1 == numOldActive) {
+
+//				blockKsOffset = d_KBounds[index];
+				blockNumKs = numKs - blockKsOffset;  // potentially unnecessary based on kBounds
+		 }
+*/
      if (blockNumKs>0){
+
        numUniquePerBlock[index]=d_findKBucketsByBlock ( d_bucketCount, d_kVals, d_markedBuckets, d_sums, d_reindexsums, numNewSmallBuckets, numNewSmallBuckets*index, d_bucketBounds[index], blockNumKs, blockKsOffset, markedBucketFlags);
      } else {
        numUniquePerBlock[index]=0;
      }
+
   
    } // end if index
  } // end kernel findKbucketByBlock_kernel
@@ -122,6 +185,7 @@ inline int findKbucketsByBlock (uint * d_bucketCount, uint * d_bucketBounds, uin
    uint *numSelected, *numSelectedSum;
    CUDA_CALL(cudaMalloc(&numSelected, sizeof(uint)));
    CUDA_CALL(cudaMalloc(&numSelectedSum, sizeof(uint)));
+
 
    // set threads and compute numBlocks 
    int numFindThreads = 64;
@@ -250,9 +314,140 @@ int Reduction(T* d_vec, T* d_new, uint * d_elementToBucket, uint* d_uniqueBucket
  }  // end function Reduction
 
 
+template <typename T>
+__global__ void printStatement(T * newInput, T * newInputAlt, int newInputLength, int newInputLengthAlt, int newNumSmallBuckets, int numNewActive, uint * d_oldReindexCounter, uint * d_reindexCounter){
+	if (threadIdx.x + blockIdx.x == 0){
+
+/*
+		for (int i = 0; i < 3; i+=2) {
+			printf("newInput %d = %.10lf\t newInput %d = %.10lf\n",
+				i,newInput[i],i+1,newInput[i+1]);
+			printf("\n");
+		} 
+
+		for (int i = 0; i < 3; i+=2) {
+			printf("newInputAlt %d = %lf\t newInputAlt %d = %lf\n",
+				i,newInputAlt[i],i+1,newInputAlt[i+1]);
+			printf("\n");
+		}
+*/
+
+		printf("newInputLength %d \t newInputLengthAlt %d\n",newInputLength,newInputLengthAlt);
+		printf("newNumSmallBuckets %d\n",newNumSmallBuckets);
+		printf("numNewActive %d\n",numNewActive);
+
+	}
+}
+
+
+template <typename T>
+__global__ void convertMinimums(double * d_oldMinimums, T * d_pivots, int slopesize){
+
+		for (int i = threadIdx.x; i < slopesize; i+= blockDim.x) {
+			d_oldMinimums[i] = (double) d_pivots[i];
+		}
+
+}
 
 
 
+
+// *****************************
+template <typename T>
+__global__ void printDeviceMemory(T* d_variable, const char *variablestring, int length){
+
+	for (int i = threadIdx.x; i < length; i += blockDim.x) {
+		printf("%s[%d] =  %f\n",variablestring,i,d_variable[i]);
+	}
+
+}
+
+/*
+template < >
+__global__ void printDeviceMemory < uint > (uint* d_variable, const char *variablestring, int length){
+
+	for (int i = threadIdx.x; i < length; i += blockDim.x) {
+		printf("%s[%d] =  %u\n",variablestring,i,d_variable[i]);
+	}
+}
+*/
+
+__global__ void printDeviceMemory_uint (uint* d_variable, const char *variablestring, int length){
+
+	for (int i = threadIdx.x; i < length; i += blockDim.x) {
+		printf("%s[%d] =  %u\n",variablestring,i,d_variable[i]);
+	}
+}
+
+// *****************************
+
+
+__global__ void printSlopes(double* d_newSlopes,double* d_oldSlopes, int numKs){
+
+	for (int i = threadIdx.x; i < numKs; i += blockDim.x) {
+		printf("newSlope %d = %lf \t oldSlope %d = %lf \n",i,d_newSlopes[i],i,d_oldSlopes[i]);
+	}
+
+}
+
+__global__ void printReindex(uint* d_reindexCounter, int numKs){
+		if (threadIdx.x + blockIdx.x == 0){
+			for(int i = 0; i < numKs; i++){
+				printf("reindexCounter[%d] = %d\n",i,d_reindexCounter[i]);
+			}
+		}
+}
+
+__global__ void printKbounds(uint* d_Kbounds, int numKs){
+		if (threadIdx.x + blockIdx.x == 0){
+			for(int i = 0; i < numKs; i++){
+				printf("Kbounds[%d] = %d\n",i,d_Kbounds[i]);
+			}
+		}
+}
+
+template <typename T>
+void pointerSwap(T** pointer_a, T** pointer_b){
+	T * tempPointer = * pointer_b;
+	* pointer_b = * pointer_a;
+	* pointer_a = tempPointer;
+}
+
+void doublePointerSwap(double** pointer_a, double** pointer_b){
+	double * tempPointer = * pointer_b;
+	* pointer_b = * pointer_a;
+	* pointer_a = tempPointer;
+}
+
+void uintPointerSwap(uint** pointer_a, uint** pointer_b){
+	uint * tempPointer = * pointer_b;
+	* pointer_b = * pointer_a;
+	* pointer_a = tempPointer;
+}
+
+void tag(int marker, int iteration){
+		printf("%d Tag %d\n",iteration,marker);
+}
+
+
+template <typename T>
+__global__ void printBuckets(int newInputLength, uint * d_elementToBucket, double * d_newMinimums, T * newInput) {
+
+	for (int i = threadIdx.x; i < newInputLength; i += blockDim.x) {
+		if (newInput[i] < d_newMinimums[i]) {
+			printf("Element: %lf \t Minimum: %lf \n",newInput[i], d_newMinimums[i]);
+		}
+	}
+
+}
+
+template <typename T>
+__global__ void printInput(int newInputLength, T * newInput) {
+
+	for (int i = 1; i < newInputLength; i++) {
+			if (newInput[i] < newInput[i - 1])	printf("newInput[%d] = %.10lf \t newInput[%d] = %.10lf\n",i,newInput[i],i - 1,newInput[i - 1]);
+	}
+}
 
 
 
