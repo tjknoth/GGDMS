@@ -56,7 +56,8 @@ namespace CompareMultiselectNewFindK {
   template<typename T>
   void compareMultiselectAlgorithms(uint size, uint* kVals, uint numKs, uint numTests
                                     , uint *algorithmsToTest, uint generateType, uint kGenerateType
-                                    , char* fileNamecsv, int world_rank, int world_size, char* processor_name, T* data = NULL) {
+                                    , char* fileNamecsv, int world_rank, int world_size, char* processor_name
+                                    , uint datatype, T* data = NULL) {
 
     // allocate space for operations
     T *h_vec, *h_vec_copy;
@@ -73,7 +74,7 @@ namespace CompareMultiselectNewFindK {
     ofstream fileCsv;
     timeval t1;
  
-    typedef results_t<T>* (*ptrToTimingFunction)(T*, uint, uint *, uint, int, int, char*);
+    typedef results_t<T>* (*ptrToTimingFunction)(T*, uint, uint *, uint, int, int, char*, uint, uint);
     typedef void (*ptrToGeneratingFunction)(T*, uint, curandGenerator_t);
 
     //these are the functions that can be called
@@ -161,14 +162,32 @@ namespace CompareMultiselectNewFindK {
         memcpy(h_vec_copy, h_vec, size * sizeof(T));
       }
 
-      //Scatter h_vec_copy
-      int* sendcounts;
+      //Scatter h_vec 
+      int* displs = (int*) malloc (world_size * sizeof(int));
+      int* sendcounts = (int*) malloc (world_size * sizeof(int));
       int offset = (int) size / world_size;
-      for (int ii = 0; ii < world_size - 1; ii++)
+      for (int ii = 0; ii < world_size - 1; ii++) {
         sendcounts[ii] = offset;
+        displs[ii] = ii * offset;
+      }
       sendcounts[world_size - 1] = size - (world_size - 1) * offset;
+      displs[world_size - 1] = (world_size - 1) * offset;
       int newSize = sendcounts[world_rank];
+      // allocate h_vecChunk to receive the chunk of h_vec
       T* h_vecChunk = (T*) malloc (newSize * sizeof(T));
+      int recv = sendcounts[world_rank];
+
+      switch (datatype) {
+      case 0:
+        MPI_Scatterv (h_vec, sendcounts, displs, MPI_FLOAT, h_vecChunk, recv, MPI_FLOAT, 0, MPI_COMM_WORLD);  
+        break;
+      case 1:
+        MPI_Scatterv (h_vec, sendcounts, displs, MPI_DOUBLE, h_vecChunk, recv, MPI_DOUBLE, 0, MPI_COMM_WORLD);  
+        break;
+      case 2:
+        MPI_Scatterv (h_vec, sendcounts, displs, MPI_UNSIGNED, h_vecChunk, recv, MPI_UNSIGNED, 0, MPI_COMM_WORLD);  
+        break;
+      }
 
       MPI_Barrier(MPI_COMM_WORLD);
 
@@ -180,11 +199,12 @@ namespace CompareMultiselectNewFindK {
         if(algorithmsToTest[j]){
 
           //run timing function j. If it is the distributed multiselect, use different arguments.
-          printf("TESTING: %u on processor rank %d of %d, named %s\n", j, world_rank, world_size, processor_name);
+          //printf("TESTING: %u on processor rank %d of %d, named %s\n", j, world_rank, world_size, processor_name);
           if (j == 2)
-            temp = arrayOfTimingFunctions[j](h_vecChunk, newSize, kVals, numKs, world_rank, world_size, processor_name);
+            temp = arrayOfTimingFunctions[j](h_vecChunk, newSize, kVals, numKs, world_rank, world_size, processor_name, datatype, size);
           else if (world_rank == 0) {
-            temp = arrayOfTimingFunctions[j](h_vec_copy, size, kVals, numKs, world_rank, world_size, processor_name);
+            // Must take size as a parameter twice to fit the template
+            temp = arrayOfTimingFunctions[j](h_vec_copy, size, kVals, numKs, world_rank, world_size, processor_name, datatype, size);
             //printf ("finished on %s\n", processor_name);
           }
 
@@ -203,7 +223,7 @@ namespace CompareMultiselectNewFindK {
 
           //perform clean up 
           if (world_rank == 0 && x != 2) {
-            free (temp);
+            //free (temp);
             memcpy(h_vec_copy, h_vec, size * sizeof(T));
           }
         }
@@ -217,7 +237,7 @@ namespace CompareMultiselectNewFindK {
             fileCsv << namesOfMultiselectTimingFunctions[x] << "," << timeArray[x][i] << ",";
       }
 
-      printf ("MORE successful on %s\n", processor_name);
+      //printf ("MORE successful on %s\n", processor_name);
 
       if (world_rank == 0) {
         // check for errors, and output information to recreate problem
@@ -271,15 +291,19 @@ namespace CompareMultiselectNewFindK {
     }
 
     // free results
-    for(i = 0; i < numTests; i++) 
-      for(m = 0; m < NUMBEROFALGORITHMS; m++) 
-        if(algorithmsToTest[m])
-          free(resultsArray[m][i]);
+    if ((world_rank == 0 && x != 2) || (x == 2)) {
+      for(i = 0; i < numTests; i++) 
+        for(m = 0; m < NUMBEROFALGORITHMS; m++) 
+          if(algorithmsToTest[m])
+            free(resultsArray[m][i]);
+    }
 
     //free h_vec and h_vec_copy
-    if(data == NULL) 
-      free(h_vec);
-    free(h_vec_copy);
+    if ((world_rank == 0 && x != 2) || (x == 2)) {
+      if(data == NULL) 
+        free(h_vec);
+      free(h_vec_copy);
+    }
 
     //close the file
     fileCsv.close();
@@ -292,7 +316,7 @@ namespace CompareMultiselectNewFindK {
   template<typename T>
   void runTests (uint generateType, char* fileName, uint startPower, uint stopPower
                  , uint timesToTestEachK, uint kDistribution, uint startK, uint stopK, uint kJump
-                 , int world_rank, int world_size, char* processor_name) {
+                 , int world_rank, int world_size, char* processor_name, uint type) {
     uint algorithmsToRun[NUMBEROFALGORITHMS]= {1, 1, 1};
     uint size;
     uint i;
@@ -333,7 +357,7 @@ namespace CompareMultiselectNewFindK {
           printf("NOW ADDING ANOTHER K\n\n");
         compareMultiselectAlgorithms<T>(size, arrayOfKs, i, timesToTestEachK, 
                                         algorithmsToRun, generateType, kDistribution, fileName
-                                        , world_rank, world_size, processor_name);
+                                        , world_rank, world_size, processor_name, type);
       }
     }
   }

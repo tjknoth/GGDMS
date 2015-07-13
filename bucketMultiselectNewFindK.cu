@@ -23,13 +23,11 @@
 #include <thrust/transform_reduce.h>
 #include <limits>
 #include <mpi.h>
-#include <boost/mpi/datatype.hpp>
 
 #include <math.h>
 #include <ctime>
 #include "recursionKernels.cu"
 #include "findk.cu"
-
 
 
 namespace BucketMultiselectNewFindK{
@@ -147,7 +145,6 @@ namespace BucketMultiselectNewFindK{
         sum += h_bucketCount[kBucket]; 
       }
       markedBuckets[i] = kBucket;
-
       sums[i] = sum - h_bucketCount[kBucket];
 
     }
@@ -275,10 +272,9 @@ namespace BucketMultiselectNewFindK{
   __global__ void sumCounts(uint * d_bucketCount, const int numBuckets
                             , const int numBlocks) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-
+    
     for(int j=1; j<numBlocks; j++) 
       d_bucketCount[index + numBuckets*j] += d_bucketCount[index + numBuckets*(j-1)];
-    
   }
 
 
@@ -403,7 +399,6 @@ namespace BucketMultiselectNewFindK{
     
     syncthreads();
 
-
     int temp_bucket, temp_active, treeindex, active, searchdepth;
 
     // binary search tree through the active buckets to see
@@ -425,6 +420,7 @@ namespace BucketMultiselectNewFindK{
         // if this element is in an active bucket, copy it to the new input vector
         if (active) {
           newArray[atomicDec(d_bucketCount + blockOffset + temp_active, length)-1] = d_vector[i];
+          //printf ("copied: %f\n", d_vector[i]);
         }  // end if (active)
       }  // ends for loop with offset jump
     } // ends if (idx < length)
@@ -469,8 +465,33 @@ namespace BucketMultiselectNewFindK{
     int loop = kListCount / MAX_THREADS_PER_BLOCK;
 
     for (int i = 0; i <= loop; i++) {      
-      if (idx < kListCount)
+      if (idx < kListCount) {
         *(outputVector + *(kIndices + idx)) = *(inputVector + *(kList + idx) - 1);
+        printf ("copied from %d\n", *(kList + idx) - 1);
+      }
+    }
+  }
+
+
+  /* This kernel sums the d_totalBucketCount vector
+   */
+  template <typename T>
+  __global__ void sumTotalCounts (uint* d_totalBucketCount, int numBlocks, int numBuckets
+                                  , int world_size) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    uint length = numBlocks * numBuckets;
+    int offset = blockDim.x * numBlocks;
+    int sum;
+    for (int i = idx; i < length; i += offset) {
+      sum = 0;
+      for (int j = 0; j < world_size; j++) {
+        int k = d_totalBucketCount[idx + (numBlocks * numBuckets * j)];
+        //sum += d_totalBucketCount[idx + (numBlocks * numBuckets * j)];
+        sum += k;
+        //printf ("adding %d from %d  ", k, idx + numBlocks * numBuckets * j);
+      }
+      //printf ("added %d at %d    ", sum, idx);
+      *(d_totalBucketCount + idx) = sum;
     }
   }
 
@@ -674,7 +695,7 @@ namespace BucketMultiselectNewFindK{
       }
       shift = (shift << 1) | 1;
     }
-        
+
     cudaFree(d_randoms);
   } // end generatePivots<uint>
 
@@ -691,7 +712,8 @@ namespace BucketMultiselectNewFindK{
   */
   template <typename T>
   T bucketMultiSelect (T* d_vector, int length, uint * kVals, int numKs, T * output, int blocks
-                       , int threads, int numBuckets, int numPivots, int world_rank, int world_size, char* processor_name) {    
+                       , int threads, int numBuckets, int numPivots, int world_rank, int world_size
+                       , char* processor_name, uint datatype) {    
 
     //CUDA_CALL(cudaDeviceReset());
 
@@ -702,9 +724,14 @@ namespace BucketMultiselectNewFindK{
     /// ***********************************************************
     timing(0,1);
 
+
+    // for (int i = 0; i < numKs; i++)
+    //   printf ("kVals[%d] = %u\n", i, kVals[i]);
+
     // SHOULD THIS HAPPEN DISTRIBUTED?
 
     //find max and min with thrust
+   
     T maximum, minimum;
 
     thrust::device_ptr<T>dev_ptr(d_vector);
@@ -715,12 +742,13 @@ namespace BucketMultiselectNewFindK{
     maximum = *result.second;
 
     //if the max and the min are the same, then we are done
-    if (maximum == minimum) {
-      for (register int i = 0; i < numKs; i++) 
-        output[i] = minimum;
+    // if (maximum == minimum) {
+    //   for (register int i = 0; i < numKs; i++) 
+    //     output[i] = minimum;
       
-      return 1;
-    }
+    //   return 1;
+    // }
+    
 
     /// ***********************************************************
     /// **** STEP 1: Initialization 
@@ -751,13 +779,34 @@ namespace BucketMultiselectNewFindK{
     CUDA_CALL(cudaMalloc(&d_elementToBucket, size));
 
     //Allocate memory to store bucket counts
+
     size_t totalBucketSize = numBlocks * numBuckets * sizeof(uint);
+    uint totalBucketLength = numBlocks * numBuckets;
     uint * h_bucketCount = (uint *) malloc (numBuckets * sizeof (uint));
+    uint * h_localBucketCount = (uint*) malloc (numBuckets * sizeof(uint));
+    uint* h_trueBucketCount = (uint*) malloc (totalBucketSize);
 
     //array showing the number of elements in each bucket
     uint * d_bucketCount; 
 
     CUDA_CALL(cudaMalloc(&d_bucketCount, totalBucketSize));
+
+    // array showing the number of elements in each bucket. Will remain local to a given processor.
+    uint* d_localBucketCount;
+
+    CUDA_CALL(cudaMalloc(&d_localBucketCount, totalBucketSize));
+
+    uint* h_totalBucketCount;
+    uint* d_totalBucketCount;
+
+    if (world_rank == 0) {
+      h_totalBucketCount = (uint*) malloc (totalBucketSize * world_size);
+      CUDA_CALL (cudaMalloc(&d_totalBucketCount, totalBucketSize * world_size));
+    }
+    else
+      h_totalBucketCount = (uint*) malloc (totalBucketSize);
+      
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // array of kth buckets
     int numUniqueBuckets;
@@ -769,7 +818,9 @@ namespace BucketMultiselectNewFindK{
     uint uniqueBuckets[numKs];
     uint * d_uniqueBuckets; 
     uint reindexCounter[numKs];  
-    uint * d_reindexCounter;    
+    uint *localReindexCounter = (uint*) malloc (numKs * sizeof(uint));
+    uint * d_reindexCounter;
+    uint * d_localReindexCounter;
     //    int precount;
 
     CUDA_CALL(cudaMalloc(&d_kVals, numKs * sizeof(uint)));
@@ -784,7 +835,6 @@ namespace BucketMultiselectNewFindK{
     int newInputLength, newInputLengthAlt;
     T* newInput;
     T* newInputAlt;
-
 
     /// ***********************************************************
     /// **** STEP 1: Initialization 
@@ -849,18 +899,48 @@ namespace BucketMultiselectNewFindK{
         if (isinf(slopes[i]))
           slopes[i] = 0;
 
+      // Send slopes, pivots, and pivottree to other processes
       for (int i = 1; i < world_size; i++) {
-        MPI_Send(slopes, numPivots, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
-        MPI_Send(pivots, numPivots, get_mpi_datatype(&pivots), i, 0, MPI_COMM_WORLD); // pivots
-        MPI_Send(pivottree, numPivots, get_mpi_datatype(&pivots), i, 0, MPI_COMM_WORLD); // pivot tree
+        switch (datatype) {
+        case 0:
+          MPI_Send(pivots, numPivots, MPI_FLOAT, i, datatype, MPI_COMM_WORLD); 
+          MPI_Send(pivottree, numPivots, MPI_FLOAT, i, datatype, MPI_COMM_WORLD);
+          break;
+        case 1:
+          MPI_Send(pivots, numPivots, MPI_DOUBLE, i, datatype, MPI_COMM_WORLD); 
+          MPI_Send(pivottree, numPivots, MPI_DOUBLE, i, datatype, MPI_COMM_WORLD);
+          break;
+        case 2:
+          MPI_Send(pivots, numPivots, MPI_UNSIGNED, i, datatype, MPI_COMM_WORLD); 
+          MPI_Send(pivottree, numPivots, MPI_UNSIGNED, i, datatype, MPI_COMM_WORLD);
+          break;
+        } // end switch
+        MPI_Send(slopes, numPivots, MPI_DOUBLE, i, datatype, MPI_COMM_WORLD);
+      } // end for
+    } // end if (world_rank == 0)
+
+    else {
+      MPI_Status status;
+      MPI_Probe(0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+      switch (status.MPI_TAG) {
+      case 0:
+        MPI_Recv(pivots, numPivots, MPI_FLOAT, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(pivottree, numPivots, MPI_FLOAT, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        break;
+      case 1:
+        MPI_Recv(pivots, numPivots, MPI_DOUBLE, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(pivottree, numPivots, MPI_DOUBLE, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        break;
+      case 2:
+        MPI_Recv(pivots, numPivots, MPI_UNSIGNED, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Recv(pivottree, numPivots, MPI_UNSIGNED, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        break;
       }
-    }
+        MPI_Recv(slopes, numPivots, MPI_DOUBLE, 0, datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } // end else
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    // for(int i=0;i<numPivots-1;i++){
-    //   printf("\n 3 Slope: %lf \n",slopes[i]);
-    // }
     CUDA_CALL(cudaMemcpy(d_slopes, slopes, numPivots * sizeof(double), 
                          cudaMemcpyHostToDevice));  
     CUDA_CALL(cudaMemcpy(d_pivots, pivots, numPivots* sizeof(T), 
@@ -874,16 +954,49 @@ namespace BucketMultiselectNewFindK{
     /// ***********************************************************
     timing(0,3);
 
+    // setToAllZero(d_bucketCount, numBuckets * numBlocks);
+    
+    // cudaDeviceSynchronize();
+
     //Distribute elements into their respective buckets
     assignSmartBucket<T><<<numBlocks, threadsPerBlock, 2 * numPivots * sizeof(T) +  
       + numPivots * sizeof(double) + numBuckets * sizeof(uint)>>>
       (d_vector, length, numBuckets, d_slopes, d_pivots, d_pivottree, numPivots, 
        d_elementToBucket, d_bucketCount, offset);
+
+    printf ("\n");
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     SAFEcuda("assignSmartBucket");
 
     CUDA_CALL(cudaMemcpy(slopes, d_slopes, numPivots * sizeof(double), 
                          cudaMemcpyDeviceToHost));  
 
+    CUDA_CALL(cudaMemcpy(h_totalBucketCount, d_bucketCount, totalBucketSize
+                         , cudaMemcpyDeviceToHost));
+    
+
+
+    // COMBINE THE COUNTS
+    if (world_rank != 0) {
+      MPI_Send (h_totalBucketCount, totalBucketLength, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD);
+    }
+    else {
+      for (int i = 1; i < world_size; i++) {
+        MPI_Recv (h_totalBucketCount + (i * totalBucketLength), totalBucketLength, MPI_UNSIGNED
+                  , i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      }
+    } // end if/else
+    
+    // Combine entries across h_totalBucketCount to form a single bucketCount array
+    if (world_rank == 0) {
+      CUDA_CALL(cudaMemcpy(d_totalBucketCount, h_totalBucketCount, totalBucketSize * world_size, cudaMemcpyHostToDevice));
+      sumTotalCounts<T><<<numBlocks, threadsPerBlock>>>(d_totalBucketCount, numBlocks, numBuckets, world_size);
+      CUDA_CALL(cudaMemcpy(d_bucketCount, d_totalBucketCount, totalBucketSize, cudaMemcpyDeviceToDevice));
+    } // end if (world_rank == 0)
+
+    SAFEcuda("sumTotalCounts");
 
     timing(1,3);
     /// ***********************************************************
@@ -893,49 +1006,136 @@ namespace BucketMultiselectNewFindK{
     /// ***********************************************************
     timing(0,4);
 
-    sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount, 
-                                                               numBuckets, numBlocks);
-    SAFEcuda("sumCounts");
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
-                 kthBucketScanner, kthBuckets, numBlocks);
-    SAFEcuda("findKBuckets");
+    int totalNewInputLength;
+    if (world_rank == 0) {
+      sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_bucketCount,          
+                                                                 numBuckets, numBlocks);
+    
+      SAFEcuda("sumCounts");
 
-    // we must update K since we have reduced the problem size to elements in the 
-    // kth bucket.
-    //  get the index of the first element
-    //  add the number of elements
-    uniqueBuckets[0] = kthBuckets[0];
-    reindexCounter[0] = 0;
-    numUniqueBuckets = 1;
-    kVals[0] -= kthBucketScanner[0];
+      findKBuckets(d_bucketCount, h_bucketCount, numBuckets, kVals, numKs, 
+                   kthBucketScanner, kthBuckets, numBlocks);
+      SAFEcuda("findKBuckets");
 
-    for (int i = 1; i < numKs; i++) {
-      if (kthBuckets[i] != kthBuckets[i-1]) {
-        uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
-        reindexCounter[numUniqueBuckets] = 
-          reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
-        numUniqueBuckets++;
+      // for (int i = 0; i < numBuckets; i++)
+      //   printf ("h_bucketCount[%d] = %d   ", i, h_bucketCount[i]);
+
+      // we must update K since we have reduced the problem size to elements in the 
+      // kth bucket.
+      //  get the index of the first element
+      //  add the number of elements
+      uniqueBuckets[0] = kthBuckets[0];
+      reindexCounter[0] = 0;
+      numUniqueBuckets = 1;
+      kVals[0] -= kthBucketScanner[0];
+
+      for (int i = 1; i < numKs; i++) {
+        if (kthBuckets[i] != kthBuckets[i-1]) {
+          uniqueBuckets[numUniqueBuckets] = kthBuckets[i];
+          reindexCounter[numUniqueBuckets] = 
+            reindexCounter[numUniqueBuckets-1]  + h_bucketCount[kthBuckets[i-1]];
+          printf ("Adding %d at i = %d index = %d\n", h_bucketCount[kthBuckets[i-1]], i, kthBuckets[i-1]);
+          numUniqueBuckets++;
+        }
+        kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
       }
-      kVals[i] = reindexCounter[numUniqueBuckets-1] + kVals[i] - kthBucketScanner[i];
+
+      totalNewInputLength = reindexCounter[numUniqueBuckets-1] 
+        + h_bucketCount[kthBuckets[numKs - 1]];
+      printf ("Adding %d at i = %d index = %d\n", h_bucketCount[kthBuckets[numKs-1]], numKs, kthBuckets[numKs-1]);
+    } // end if (world_rank == 0)
+
+    if (world_rank == 0) {
+      for (int i = 1; i < world_size; i++) {
+        MPI_Send(kthBuckets, numKs, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&numUniqueBuckets, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        MPI_Send(uniqueBuckets, numUniqueBuckets, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+      }
+    }
+    else {
+      MPI_Recv(kthBuckets, numKs, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
+      MPI_Recv(&numUniqueBuckets, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(uniqueBuckets, numUniqueBuckets, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    newInputLength = reindexCounter[numUniqueBuckets-1] 
-      + h_bucketCount[kthBuckets[numKs - 1]];
-    
-    // reindex the counts
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // locally calculate newInputLength
+    int sumsRowIndex = numBuckets * (numBlocks-1);
+    CUDA_CALL(cudaMemcpy(d_localBucketCount, h_totalBucketCount, totalBucketSize, cudaMemcpyHostToDevice));
+    sumCounts<<<numBuckets/threadsPerBlock, threadsPerBlock>>>(d_localBucketCount
+                                                               , numBuckets, numBlocks);
+    CUDA_CALL(cudaMemcpy(h_localBucketCount, d_localBucketCount + sumsRowIndex
+                         , sizeof(uint) * numBuckets, cudaMemcpyDeviceToHost));
+    localReindexCounter[0] = 0;
+    int bucketCounter = 1;
+    for (int i = 1; i < numKs; i++) {
+      if (kthBuckets[i] != kthBuckets[i-1]) {
+        localReindexCounter[bucketCounter] = 
+          localReindexCounter[bucketCounter-1] + h_localBucketCount[kthBuckets[i-1]];
+        printf ("Summing %d at i = %d index = %d on %d\n", h_localBucketCount[kthBuckets[i-1]], i, kthBuckets[i-1], world_rank);
+        bucketCounter++;
+      } // end if
+    } // end for
+
+    newInputLength = localReindexCounter[numUniqueBuckets-1]
+      + h_localBucketCount[kthBuckets[numKs-1]];
+    printf ("Summing %d at i = %d index = %d on %d\n", h_localBucketCount[kthBuckets[numKs-1]], numKs, kthBuckets[numKs-1], world_rank);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // reindex the counts locally and globally
     CUDA_CALL(cudaMalloc(&d_reindexCounter, numKs * sizeof(uint)));
     CUDA_CALL(cudaMalloc(&d_uniqueBuckets, numKs * sizeof(uint)));
+    CUDA_CALL(cudaMalloc(&d_localReindexCounter, numKs * sizeof(uint)));
 
     CUDA_CALL(cudaMemcpy(d_reindexCounter, reindexCounter, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, 
                          numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_localReindexCounter, localReindexCounter,
+                         numUniqueBuckets * sizeof(uint), cudaMemcpyHostToDevice));
 
-    reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
-      threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
+    reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock),
+      threadsPerBlock>>>(d_localBucketCount, numBuckets, numBlocks, d_localReindexCounter,
                          d_uniqueBuckets, numUniqueBuckets);
+
+    if (world_rank == 0) {
+      reindexCounts<<<(int) ceil((float)numUniqueBuckets/threadsPerBlock), 
+        threadsPerBlock>>>(d_bucketCount, numBuckets, numBlocks, d_reindexCounter, 
+                           d_uniqueBuckets, numUniqueBuckets);
+    }
     SAFEcuda("reindexCounts");
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    cudaDeviceSynchronize();
+
+    //send the now updated information out to all processes after copying it to the host
+    if (world_rank == 0) {
+      CUDA_CALL(cudaMemcpy(h_trueBucketCount, d_bucketCount, totalBucketSize, cudaMemcpyDeviceToHost));
+      CUDA_CALL(cudaMemcpy(reindexCounter, d_reindexCounter, numKs * sizeof (uint), cudaMemcpyDeviceToHost));
+      for (int i = 1; i < world_size; i++) {
+        MPI_Send(h_trueBucketCount, numBlocks * numBuckets, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+        MPI_Send(reindexCounter, numKs, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+        MPI_Send(kVals, numKs, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&totalNewInputLength, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+      }
+    }
+    else {
+      MPI_Recv(h_trueBucketCount, numBlocks * numBuckets, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(reindexCounter, numKs, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(kVals, numKs, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(&totalNewInputLength, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      CUDA_CALL(cudaMemcpy (d_bucketCount, h_trueBucketCount, totalBucketSize, cudaMemcpyHostToDevice));
+      CUDA_CALL(cudaMemcpy (d_reindexCounter, reindexCounter, numKs * sizeof (uint), cudaMemcpyHostToDevice));
+    }
+
+    printf ("total new len = %d, new len = %d on %d\n", totalNewInputLength, newInputLength, world_rank);
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     timing(1,4);
     /// ***********************************************************
@@ -946,8 +1146,11 @@ namespace BucketMultiselectNewFindK{
     timing(0,5);
 
     // allocate memory for the new array
-    CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
-   
+    if (world_rank != 0)
+      CUDA_CALL(cudaMalloc(&newInput, newInputLength * sizeof(T)));
+    else
+      CUDA_CALL(cudaMalloc(&newInput, totalNewInputLength * sizeof(T)));
+
     int numUnique_extended = ( 2 << (int)( floor( log2( (float)numUniqueBuckets ) ) ) );
     if (numUnique_extended > numUniqueBuckets+1){
       numUnique_extended--;
@@ -958,11 +1161,10 @@ namespace BucketMultiselectNewFindK{
     copyElements_tree<T><<<numBlocks, threadsPerBlock, 
       numUnique_extended * sizeof(uint)>>>(d_vector, length, d_elementToBucket, 
                                            d_uniqueBuckets, numUniqueBuckets, numUnique_extended, newInput, offset, 
-                                           d_bucketCount, numBuckets);
+                                           d_localBucketCount, numBuckets);
     SAFEcuda("copyElements");
 
-
-
+    
     timing(1,5);
     /// ***********************************************************
     /// **** STEP 6: sort&choose
@@ -971,6 +1173,9 @@ namespace BucketMultiselectNewFindK{
     /// **** we solve the reduced problem.
     /// ***********************************************************
     timing(0,6);
+    
+
+    /*
 
 
     // declare and allocate device memory for recursion phase
@@ -1018,6 +1223,9 @@ namespace BucketMultiselectNewFindK{
 
     // Recreate sub-buckets
 
+    printf ("about to recreate on %d\n", world_rank);
+
+    // Recreate buckets on each processor
     recreateBuckets<T><<<recreateBlocks, recreateThreads
       , numOldActive*sizeof(double)*2>>>(d_uniqueBuckets, d_newSlopes, d_newMinimums
                                          , numNewActive, d_oldSlopes, d_pivots, numOldActive
@@ -1026,7 +1234,6 @@ namespace BucketMultiselectNewFindK{
     cudaDeviceSynchronize();
     SAFEcuda("recreateBuckets");
 
-
     reassignBuckets<T><<<numNewActive, threadsPerBlock
       , newNumSmallBuckets*sizeof(uint)>>>(newInput, newInputLength, d_reindexCounter, d_newSlopes
                                            , d_newMinimums, numNewActive, newNumSmallBuckets
@@ -1034,6 +1241,8 @@ namespace BucketMultiselectNewFindK{
 
     cudaDeviceSynchronize();
     SAFEcuda("reassignBuckets");
+
+    // Need to combine information again
 
     tempReindex = d_oldReindexCounter;
     d_oldReindexCounter = d_reindexCounter;
@@ -1093,54 +1302,132 @@ namespace BucketMultiselectNewFindK{
 
     SAFEcuda("Reduction");
 
+    */
 
+    // OLD STUFF BEGINS
+    timing(1,6);
+    timing(0,7);
+    //printf ("NEW LENGTH = %d\n", newInputLengthAlt);
+    
+    T* totalNewInput;
+    if (world_rank == 0)
+      totalNewInput = (T*) malloc (totalNewInputLength * sizeof(T));
+    int recvCounts[world_size];
+    int recvDispls[world_size];
 
+    //printf ("SENDING\n");
+    if (world_rank != 0)
+      MPI_Send(&newInputLength, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    else {
+      for (int i = 1; i < world_size; i++)
+        MPI_Recv(recvCounts + i, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      recvCounts[0] = newInputLength;
+      recvDispls[0] = 0;
+      for (int i = 1; i < world_size; i++)
+        recvDispls[i] = recvDispls[i - 1] + recvCounts[i - 1];
+    }
 
+    T* h_newInput;
+    h_newInput = (T*) malloc (newInputLength * sizeof(T));
+
+    if (world_rank != 0)
+      CUDA_CALL(cudaMemcpy (h_newInput, newInput, newInputLength * sizeof(T), cudaMemcpyDeviceToHost));
+    else
+      CUDA_CALL(cudaMemcpy (totalNewInput, newInput, newInputLength * sizeof(T), cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize();
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    // for (int i = 0; i <newInputLength; i++)
+    //   printf ("h_newInput[%d] on %d = %f\n", i, world_rank, h_newInput[i]);
+    
+    // Combine the reduced vectors into a single input vector for sorting
+    if (world_rank != 0) {
+      switch (datatype) {
+      case 0: 
+        MPI_Send(h_newInput, newInputLength, MPI_FLOAT, 0, datatype, MPI_COMM_WORLD);
+        break;
+      case 1:
+        MPI_Send(h_newInput, newInputLength, MPI_DOUBLE, 0, datatype, MPI_COMM_WORLD);
+        break;
+      case 2:
+        MPI_Send(h_newInput, newInputLength, MPI_UNSIGNED, 0, datatype, MPI_COMM_WORLD);
+        break;
+      }
+    }
+
+    else {
+      //MPI_Status status;
+      for (int i = 1; i < world_size; i++) {
+        switch(datatype) {  
+        case 0:
+          MPI_Recv(totalNewInput + recvDispls[i], recvCounts[i], MPI_FLOAT, i
+                   , datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
+          break;
+        case 1:
+          MPI_Recv(totalNewInput + recvDispls[i], recvCounts[i], MPI_DOUBLE, i
+                   , datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
+          break;
+        case 2:
+          MPI_Recv(totalNewInput + recvDispls[i], recvCounts[i], MPI_UNSIGNED, i
+                   , datatype, MPI_COMM_WORLD, MPI_STATUS_IGNORE); 
+          break;
+        }
+      }
+      CUDA_CALL(cudaMemcpy(newInput, totalNewInput, totalNewInputLength * sizeof(T), cudaMemcpyHostToDevice));
+    }
+
+    T* d_totalNewInput;
+
+    // Sort and choose
+    if (world_rank == 0) {
+      for (int i = 0; i < totalNewInputLength; i++)
+        printf ("totalNewInput[%d] = %f\n", i, totalNewInput[i]);
+      for (int i = 0; i < numKs; i++)
+        printf ("kVals[%d] = %d\n", i, kVals[i]);
+      CUDA_CALL(cudaMalloc(&d_totalNewInput, totalNewInputLength * sizeof(T)));
+      CUDA_CALL(cudaMemcpy(d_totalNewInput, totalNewInput, totalNewInputLength * sizeof(T), cudaMemcpyHostToDevice));
+      sort_phase<T>(d_totalNewInput, totalNewInputLength);
+      SAFEcuda("sort_phase");
+      T * d_output = (T *) d_elementToBucket;
+      CUDA_CALL(cudaMemcpy (d_output, output, 
+                            (numKs + kOffsetMin + kOffsetMax) * sizeof (T), 
+                            cudaMemcpyHostToDevice));
+
+      CUDA_CALL(cudaMemcpy (d_kIndices, kIndices, numKs * sizeof (uint), 
+                            cudaMemcpyHostToDevice));
+      CUDA_CALL(cudaMemcpy (d_kVals, kVals, numKs * sizeof (uint), cudaMemcpyHostToDevice));
+
+      copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, d_totalNewInput, d_kVals, d_kIndices, numKs);
+    
+      SAFEcuda("copyValuesInChunk");
+
+      CUDA_CALL(cudaMemcpy (output, d_output, 
+                            (numKs + kOffsetMin + kOffsetMax) * sizeof (T), 
+                            cudaMemcpyDeviceToHost));
+    }
+    
+    SAFEcuda("sort_phase global");
+
+    //free all used memory
     cudaFree(d_pivots);
     cudaFree(d_pivottree);
     cudaFree(d_slopes); 
     free(h_bucketCount);
     cudaFree(d_bucketCount);
     cudaFree(d_uniqueBuckets); 
-    cudaFree(d_markedBucketFlags); 
-    cudaFree(d_sums); 
+    //cudaFree(d_markedBucketFlags); 
+    //cudaFree(d_sums); 
     cudaFree(d_reindexCounter);
-    cudaFree(d_oldReindexCounter);
-    cudaFree(d_newMinimums);
-    cudaFree(d_newSlopes);
+    //cudaFree(d_oldReindexCounter);
+    //cudaFree(d_newMinimums);
+    //cudaFree(d_newSlopes);
     cudaFree(newInput); 
-
-    // OLD STUFF BEGINS
-    timing(1,6);
-    timing(0,7);
-    //printf ("NEW LENGTH = %d\n", newInputLengthAlt);
-
-    sort_phase<T>(newInputAlt, newInputLengthAlt);
-    SAFEcuda("sort_phase");
-
-    T * d_output = (T *) d_elementToBucket;
-    CUDA_CALL(cudaMemcpy (d_output, output, 
-                          (numKs + kOffsetMin + kOffsetMax) * sizeof (T), 
-                          cudaMemcpyHostToDevice));
-
-    CUDA_CALL(cudaMemcpy (d_kIndices, kIndices, numKs * sizeof (uint), 
-                          cudaMemcpyHostToDevice));
-
-    copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, newInputAlt, d_kVals, d_kIndices, numKs);
-    SAFEcuda("copyValuesInChunk");
-
-    CUDA_CALL(cudaMemcpy (output, d_output, 
-                          (numKs + kOffsetMin + kOffsetMax) * sizeof (T), 
-                          cudaMemcpyDeviceToHost));
-
-    //free all used memory
- 
  
   
     cudaFree(d_elementToBucket);  
     cudaFree(d_kIndices); 
     cudaFree(d_kVals); 
-    cudaFree(newInputAlt);
+    //cudaFree(newInputAlt);
     free (kIndices - kOffsetMin);
 
     /// ***********************************************************
@@ -1163,16 +1450,17 @@ namespace BucketMultiselectNewFindK{
   template <typename T>
   T bucketMultiselectWrapper (T * d_vector, int length, uint * kVals_ori, int numKs
                               , T * outputs, int blocks, int threads, int world_rank
-                              , int world_size, char* processor_name) { 
+                              , int world_size, char* processor_name, uint datatype, uint origLen) { 
 
     int numBuckets = 8192;
     uint kVals[numKs];
 
+
     // turn it into kth smallest
     for (register int i = 0; i < numKs; i++) 
-      kVals[i] = length - kVals_ori[i] + 1;
+      kVals[i] = origLen - kVals_ori[i] + 1;
    
-    bucketMultiSelect<T> (d_vector, length, kVals, numKs, outputs, blocks, threads, numBuckets, 17, world_rank, world_size, processor_name);
+    bucketMultiSelect<T> (d_vector, length, kVals, numKs, outputs, blocks, threads, numBuckets, 17, world_rank, world_size, processor_name, datatype);
 
     return 1;
   }

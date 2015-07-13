@@ -863,7 +863,6 @@ timing(0,4);
     newInputLength = reindexCounter[numUniqueBuckets-1] 
       + h_bucketCount[kthBuckets[numKs - 1]];
 
-
     // reindex the counts
     CUDA_CALL(cudaMalloc(&d_reindexCounter, numUniqueBuckets * sizeof(uint)));
     CUDA_CALL(cudaMalloc(&d_uniqueBuckets, numUniqueBuckets * sizeof(uint)));

@@ -146,15 +146,18 @@ int main (int argc, char *argv[]) {
   switch(type){
   case 0:
     runTests<float>(distributionType,fileName,startPower,stopPower,testCount,
-                    kDistribution,startK,stopK,jumpK,world_rank,world_size,processor_name);
+                    kDistribution,startK,stopK,jumpK,world_rank,world_size
+                    ,processor_name,type);
     break;
   case 1:
     runTests<double>(distributionType,fileName,startPower,stopPower,testCount,
-                     kDistribution,startK,stopK,jumpK,world_rank,world_size,processor_name);
+                     kDistribution,startK,stopK,jumpK,world_rank,world_size
+                     ,processor_name,type);
     break;
   case 2:
     runTests<uint>(distributionType,fileName,startPower,stopPower,testCount,
-                   kDistribution,startK,stopK,jumpK,world_rank,world_size,processor_name);
+                   kDistribution,startK,stopK,jumpK,world_rank,world_size
+                   ,processor_name,type);
     break;
   default:
     if (world_rank == 0)

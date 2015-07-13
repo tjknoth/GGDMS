@@ -26,8 +26,6 @@ void setupForTiming(cudaEvent_t &start, cudaEvent_t &stop, T * h_vec, T ** d_vec
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
 
-  // Scatter, then copy
-
   cudaMalloc(d_vec, numElements * sizeof(T));
   cudaMemcpy(*d_vec, h_vec, numElements * sizeof(T), cudaMemcpyHostToDevice);
 
@@ -71,7 +69,7 @@ inline void bestSort<double>(double * d_vec, const uint numElements) {
 
 
 template<typename T>
-results_t<T>* timeSortAndChooseMultiselect_a(T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
+results_t<T>* timeSortAndChooseMultiselect_a(T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name, uint datatype, uint origSize) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -120,7 +118,7 @@ results_t<T>* timeSortAndChooseMultiselect_a(T * h_vec, uint numElements, uint *
 
 
 template<typename T>
-results_t<T>* timeBucketMultiselect_a (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
+results_t<T>* timeBucketMultiselect_a (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name, uint datatype, uint origSize) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -147,7 +145,7 @@ results_t<T>* timeBucketMultiselect_a (T * h_vec, uint numElements, uint * kVals
 
 
 template<typename T>
-results_t<T>* timeBucketMultiselectNewFindK_a (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name) {
+results_t<T>* timeBucketMultiselectNewFindK_a (T * h_vec, uint numElements, uint * kVals, uint kCount, int world_rank, int world_size, char* processor_name, uint datatype, uint origSize) {
   T * d_vec;
   results_t<T> * result;
   float time;
@@ -155,16 +153,16 @@ results_t<T>* timeBucketMultiselectNewFindK_a (T * h_vec, uint numElements, uint
   cudaDeviceProp dp;
   cudaGetDeviceProperties(&dp, GPUNUMBER);
 
-  printf ("timing on processor %d. numElements = %u, kCount = %u\n", world_rank, numElements, kCount);
+  //printf ("timing on processor %d. numElements = %u, kCount = %u\n", world_rank, numElements, kCount);
 
-  // If world_rank == 0
   setupForTiming(start, stop, h_vec, &d_vec, &result, numElements, kCount);
  
   // Do on all processes
   cudaEventRecord(start, 0);
 
   // bucketMultiselectWrapper (T * d_vector, int length, uint * kVals_ori, uint kCount, T * outputs, int blocks, int threads)
-  BucketMultiselectNewFindK::bucketMultiselectWrapper(d_vec, numElements, kVals, kCount, result->vals, dp.multiProcessorCount, dp.maxThreadsPerBlock, world_rank, world_size, processor_name);
+  BucketMultiselectNewFindK::bucketMultiselectWrapper(d_vec, numElements, kVals, kCount, result->vals, dp.multiProcessorCount
+                                                      , dp.maxThreadsPerBlock, world_rank, world_size, processor_name, datatype, origSize);
  
   cudaEventRecord(stop, 0);
   cudaEventSynchronize(stop);

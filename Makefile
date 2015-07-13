@@ -8,26 +8,24 @@ NVCC := nvcc #-ccbin /usr/bin
 .SUFFIXES: .c .cpp .cu .o
 
 # Includes
-INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I./lib/ -I./moderngpu/include -I/usr/include/openmpi -I/usr/include/boost/mpi
+INCLUDES = -I. -I$(CUDA_INSTALL_PATH)/include -I./lib/ -I./moderngpu/include -I/usr/include/openmpi
 # Libraries
 LIB_CUDA := -L$(CUDA_INSTALL_PATH)/lib64 -lcurand -lcudart
 # LIB_CUDA := -L$(CUDA_INSTALL_PATH)/lib -lcurand -lm -lgsl -lgslcblas
 LIB_MPI := -L/usr/lib/openmpi -lmpi
-LIB_BOOST := -lboost_mpi-gcc-mt-1_35 -lboost_serialization-gcc-d-1_35.a
 # ARCH
 ARCH = -arch=sm_20
 # dynamic parallelism
 CDP = -DCUB_CDP
 
 # Common flags
- COMMONFLAGS += $(INCLUDES)
- COMMONFLAGS += -g
+COMMONFLAGS += $(INCLUDES)
+COMMONFLAGS += -g
 # Compilers
 NVCCFLAGS += $(COMMONFLAGS)
 NVCCFLAGS += $(ARCH)
 NVCCFLAGS += $(LIB_CUDA)
 NVCCFLAGS += $(LIB_MPI)
-NVCCFLAGS += $(LIB_BOOST)
 CXXFLAGS += $(COMMONFLAGS)
 CFLAGS += $(COMMONFLAGS)
 
@@ -68,7 +66,7 @@ compareMultiselectNewFindK.cu \
 bucketMultiselectNewFindK.cu naiveBucketMultiselect.cu \
 bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
 generateProblems.cu multiselectTimingFunctionsNewFindK.cu \
-recursionKernels.cu findk.cu 
+recursionKernels.cu findk.cu
 
 AnalyzeMultiselect = \
 analyzeMultiselect.cu \
