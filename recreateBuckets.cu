@@ -6,12 +6,12 @@
    * Notes: Make sure slopes is allocated. Get endpoints.
    */
   template <typename T>
-  __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, T * pivots,
+  __global__ void recreateBuckets (T * d_vector, int numBuckets, double * originalSlopes, double * pivots,
                                    uint * elementToBucket, uint* d_bucketCount
                                    , uint offset, int length, int sumsRowIndex, const int numBigBuckets, int precount
                                    , uint * d_uniqueBuckets, uint* bucketBounds, uint * reindexCounts) {
 
-    __shared__ T minimum;
+    __shared__ double minimum;
     __shared__ double slope;
     __shared__ int previousBuckets;
     __shared__ int numSubBuckets;

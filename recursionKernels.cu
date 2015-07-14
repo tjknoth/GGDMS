@@ -61,8 +61,6 @@ __global__ void recreateBuckets (uint * d_uniqueBuckets,
     width = 1 / oldSlope;
     newMinimums[index] = (oldBucket - precount) * width + shared_oldMinimums[oldBigBucket];
     newSlopes[index] = newNumSmallBuckets * oldSlope;
-		printf("\n******\n index = %d\n oldBucket = %u\t oldBigBucket = %u\t oldSlope = %lf\t width = %lf\t newSlopes[%d] = %lf newMinimums[%d] = %lf"
-				,index,oldBucket,oldBigBucket,oldSlope,width,index,newSlopes[index],index,newMinimums[index]);
   } // end if(index<numUniqueBuckets)
 	if (threadIdx.x < 1) printf("\n********************************\n********************************\n\n");
 } // end kernel recreateBuckets
@@ -188,6 +186,60 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 	syncthreads();
 } // end kernel reassignBuckets
 
+template <typename T>
+void checkBuckets(T * newInput, uint * Kbounds, uint * reindexCounter, uint numOldActive, int numKs, int newInputLength) {
+
+		// Initialize
+		int blockNumKs;
+		int start, end;
+		int count = 0;
+		T * tempInput;
+
+
+	for (int index = 0; index < numOldActive - 1; index++){
+//	while (index < numOldActive - 1){
+		// Find blockNumKs
+		blockNumKs = Kbounds[index + 1] - Kbounds[index];
+
+
+		if (blockNumKs > 1) {
+		// Find relevant section of newInput
+			start = reindexCounter[index + count];
+//			if (index + count + blockNumKs < numKs) {
+			if (index + count < numKs - 1) {
+				end = reindexCounter[index + count + blockNumKs];
+			} else {
+				end = newInputLength;
+			}
+			printf("tag 3\n");
+
+			tempInput = (T *) malloc((end - start) * sizeof(T));
+
+
+			printf("index %d \t blockNumKs = %d \t count = %d \t start = %d \t end = %d \n",index,blockNumKs,count,start,end);
+
+			// Sort
+			cudaMemcpy(tempInput, newInput + start, (end - start) * sizeof(T), cudaMemcpyDeviceToHost);
+/*
+			for(int i = 0; i < end - start; i++) {
+				printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
+			}
+*/
+			sort(tempInput,end - start);
+/*
+			for(int i = 0; i < end - start; i++) {
+				printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
+			}
+*/
+			cudaMemcpy(newInput + start, tempInput, (end - start) * sizeof(T), cudaMemcpyHostToDevice);
+
+			count += blockNumKs - 1;
+//			index += blockNumKs - 1;
+		}
+//	index += 1;
+	}
+}
+
 
 __global__ void printMinimums(double * minimums, int numKs){
 
@@ -198,5 +250,19 @@ __global__ void printMinimums(double * minimums, int numKs){
 		}
 }
 
+template <typename T>
+void sort(T* vector, int length){
 
+	int j = 0;
+	while (j < length - 1) {
+		for (int i = j + 1; i < length; i++){
+			if (vector[i] < vector[j]) {
+				T temp = vector[i];
+				vector[i] = vector[j];
+				vector[j] = temp;
+			}
+		}
+		j++;
+	}
+}
 

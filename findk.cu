@@ -26,7 +26,7 @@ __global__ void	printActive(uint * d_uniqueBuckets, int numActive){
 	}
 }
 
-
+/*
 __device__ void correctBlocks(int blockNumKs){
 
 	if(blockNumKs > 1) {
@@ -36,7 +36,7 @@ __device__ void correctBlocks(int blockNumKs){
 	}
 
 }
-
+*/
 
 
 __device__ uint d_findKBucketsByBlock(uint * d_bucketCount, uint * kVals, uint * markedBuckets, 
@@ -119,7 +119,7 @@ __global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals
      }
 			if (blockNumKs > 1) {
 			printf("index = %d \t blockNumKs = %d\n",index,blockNumKs);
-			printf("bucketBounds[%d] = %u\n bucketBounds[%d] = %u\n\n",index,d_reindexsums[index],index + 1,d_reindexsums[index + 1]);
+			printf("bucketBounds[%d] = %u \t bucketBounds[%d] = %u \t bucketBounds[%d] = %u \n\n",index,d_reindexsums[index],index + 1,d_reindexsums[index + 1],index + 2,d_reindexsums[index + 2]);
      }
 
 		syncthreads();
@@ -130,8 +130,7 @@ __global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals
 				blockNumKs = numKs - blockKsOffset;  // potentially unnecessary based on kBounds
 		 }
 */
-     if (blockNumKs>0){
-
+     if (blockNumKs > 0){
        numUniquePerBlock[index]=d_findKBucketsByBlock ( d_bucketCount, d_kVals, d_markedBuckets, d_sums, d_reindexsums, numNewSmallBuckets, numNewSmallBuckets*index, d_bucketBounds[index], blockNumKs, blockKsOffset, markedBucketFlags);
      } else {
        numUniquePerBlock[index]=0;
