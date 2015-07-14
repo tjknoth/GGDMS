@@ -267,27 +267,29 @@ namespace CompareMultiselectNewFindK {
         fileCsv << flag << "\n";
       }
  
-  
-      //calculate the total time each algorithm took
-      for(i = 0; i < numTests; i++)
-        for(j = 0; j < NUMBEROFALGORITHMS;j++)
-          if(algorithmsToTest[j])
-            totalTimesPerAlgorithm[j] += timeArray[j][i];
+      if (world_rank == 0) {
+        //calculate the total time each algorithm took
+        for(i = 0; i < numTests; i++)
+          for(j = 0; j < NUMBEROFALGORITHMS;j++)
+            if(algorithmsToTest[j])
+              totalTimesPerAlgorithm[j] += timeArray[j][i];
 
-      //count the number of times each algorithm won. 
-      for(i = 0; i < numTests;i++)
-        timesWon[winnerArray[i]]++;
+        //count the number of times each algorithm won. 
+        for(i = 0; i < numTests;i++)
+          timesWon[winnerArray[i]]++;
 
-      printf("\n\n");
+        printf("\n\n");
 
-      //print out the average times
-      for(i = 0; i < NUMBEROFALGORITHMS; i++)
-        if(algorithmsToTest[i])
-          printf("%-20s averaged: %f ms\n", namesOfMultiselectTimingFunctions[i], totalTimesPerAlgorithm[i] / numTests);
+        //print out the average times
 
-      for(i = 0; i < NUMBEROFALGORITHMS; i++)
-        if(algorithmsToTest[i])
-          printf("%s won %u times\n", namesOfMultiselectTimingFunctions[i], timesWon[i]);
+        for(i = 0; i < NUMBEROFALGORITHMS; i++)
+          if(algorithmsToTest[i])
+            printf("%-20s averaged: %f ms\n", namesOfMultiselectTimingFunctions[i], totalTimesPerAlgorithm[i] / numTests);
+
+        for(i = 0; i < NUMBEROFALGORITHMS; i++)
+          if(algorithmsToTest[i])
+            printf("%s won %u times\n", namesOfMultiselectTimingFunctions[i], timesWon[i]);
+      } // end if (world_rank == 0)
     }
 
     // free results
