@@ -196,17 +196,22 @@ void checkBuckets(T * newInput, uint * Kbounds, uint * reindexCounter, uint numO
 		T * tempInput;
 
 
-	for (int index = 0; index < numOldActive - 1; index++){
+
+	for (int index = 0; index < numOldActive; index++){
 //	while (index < numOldActive - 1){
 		// Find blockNumKs
-		blockNumKs = Kbounds[index + 1] - Kbounds[index];
+		if (index < numOldActive - 1) {
+			blockNumKs = Kbounds[index + 1] - Kbounds[index];
+		} else {
+			blockNumKs = numKs - Kbounds[index];
+		}
 
 
 		if (blockNumKs > 1) {
 		// Find relevant section of newInput
 			start = reindexCounter[index + count];
 //			if (index + count + blockNumKs < numKs) {
-			if (index + count < numKs - 1) {
+			if (index + count + blockNumKs < numOldActive - 1) {
 				end = reindexCounter[index + count + blockNumKs];
 			} else {
 				end = newInputLength;
@@ -219,22 +224,27 @@ void checkBuckets(T * newInput, uint * Kbounds, uint * reindexCounter, uint numO
 			printf("index %d \t blockNumKs = %d \t count = %d \t start = %d \t end = %d \n",index,blockNumKs,count,start,end);
 
 			// Sort
-			cudaMemcpy(tempInput, newInput + start, (end - start) * sizeof(T), cudaMemcpyDeviceToHost);
+//			if (blockNumKs < end - start) {
+				cudaMemcpy(tempInput, newInput + start, (end - start) * sizeof(T), cudaMemcpyDeviceToHost);
 /*
-			for(int i = 0; i < end - start; i++) {
-				printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
-			}
+				for(int i = 0; i < end - start; i++) {
+					printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
+				}
 */
-			sort(tempInput,end - start);
+
+				sort(tempInput,end - start);
 /*
-			for(int i = 0; i < end - start; i++) {
-				printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
-			}
+				for(int i = 0; i < end - start; i++) {
+					printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
+				}
 */
+
 			cudaMemcpy(newInput + start, tempInput, (end - start) * sizeof(T), cudaMemcpyHostToDevice);
+//			}
 
 			count += blockNumKs - 1;
 //			index += blockNumKs - 1;
+			free(tempInput);
 		}
 //	index += 1;
 	}
