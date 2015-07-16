@@ -1331,8 +1331,7 @@ namespace BucketMultiselectNewFindK{
     // *****************************************************
 
     // determine the number of buckets per new block
-    newNumSmallBuckets = ((numBlocks*numBuckets/numNewActive) > 8192) ? 8192 : (numBlocks*numBuckets/numNewActive);
-    //    newNumSmallBuckets = numBuckets/numNewActive;
+    newNumSmallBuckets = min (11264, (numBlocks*numBuckets/numNewActive));
 
     CUDA_CALL(cudaMemcpy (d_kVals, kVals, numKs * sizeof (uint), cudaMemcpyHostToDevice));
 
