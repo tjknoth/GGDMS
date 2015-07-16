@@ -111,7 +111,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 
     // compute the local bucket via the linear projection
     localBucket = (int) (((double)num - minimum) * slope);
-    if (localBucket == newNumSmallBuckets) {
+    if (localBucket > newNumSmallBuckets - 1) {
       localBucket = newNumSmallBuckets-1;  // ensure local bucket stays within this block
     } 
        

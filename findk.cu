@@ -69,9 +69,12 @@ __global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals
    int blockKsOffset, blockNumKs;
    if (index < numOldActive) {
      blockKsOffset = d_KBounds[index];
+     if (index  + 1 < numOldActive) {
      blockNumKs = d_KBounds[index+1] - blockKsOffset;
-     if (index+1 == numOldActive) blockNumKs = numKs - blockKsOffset;  // potentially unnecessary based on kBounds
-     if (blockNumKs>0){
+     } else {
+       blockNumKs = numKs - blockKsOffset;  // potentially unnecessary based on kBounds
+     }
+     if (blockNumKs > 0){
        numUniquePerBlock[index]=d_findKBucketsByBlock ( d_bucketCount, d_kVals, d_markedBuckets, d_sums, d_reindexsums, numNewSmallBuckets, numNewSmallBuckets*index, d_bucketBounds[index], blockNumKs, blockKsOffset, markedBucketFlags);
      } else {
        numUniquePerBlock[index]=0;
