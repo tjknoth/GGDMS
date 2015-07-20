@@ -124,8 +124,8 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
     } else {
       blockEnd = vecLength;
     }
-		//printf("\n******\n blockIdx.x = %d\n******\nslope = %lf\tminimum = %lf\tblockBucketOffset = %d\tblockStart = %d\tblockEnd = %d\n"
-		//		,blockIdx.x,slope,minimum,blockBucketOffset,blockStart,blockEnd);
+//		printf("\n******\n blockIdx.x = %d\n******\nslope = %lf\tminimum = %lf\tblockBucketOffset = %d\tblockStart = %d\tblockEnd = %d\n"
+	//			,blockIdx.x,slope,minimum,blockBucketOffset,blockStart,blockEnd);
 
   }  // end if threadIndex<1 for shared memory constants 
 
@@ -161,7 +161,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
     // compute the local bucket via the linear projection
     localBucket = (int) (((double)num - minimum) * slope);
 		if (localBucket > newNumSmallBuckets - 1) {
-       printf("localBucket = %d    block = %d blockStart = %d blockEnd = %d    num %d = %.10f   minimum = %.10f \n",localBucket,blockIndex,blockStart,blockEnd,i,num,minimum);
+       printf("bucket = %d index %d start %d end %d \nnum %d = %.15f min = %.15f \n\n",localBucket,blockIndex,blockStart,blockEnd,i,num,minimum);
     //   double biggest = newNumSmallBuckets/slope+minimum;
     //   printf("localBucket = %d, newNumSmallBuckets = %d    num = %f   minimum = %f  slope =%f maximum = %f\n",localBucket,newNumSmallBuckets,num,minimum,slope,biggest);
     }
@@ -187,13 +187,13 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 } // end kernel reassignBuckets
 
 template <typename T>
-void checkBuckets(T * newInput, uint * Kbounds, uint * reindexCounter, uint numOldActive, int numKs, int newInputLength) {
+void checkBuckets(T * newInput, uint * Kbounds, uint * reindexCounter, uint numOldActive, int numKs, int newInputLength, int numNewActive) {
 
 		// Initialize
 		int blockNumKs;
 		int start, end;
 		int count = 0;
-		T * tempInput;
+
 
 
 
@@ -214,41 +214,71 @@ void checkBuckets(T * newInput, uint * Kbounds, uint * reindexCounter, uint numO
 			if (index + count + blockNumKs < numOldActive - 1) {
 				end = reindexCounter[index + count + blockNumKs];
 			} else {
+				printf("index %d \t count %d \t blockNumKs %d \n",index,count,blockNumKs);
 				end = newInputLength;
 			}
-			printf("tag 3\n");
 
-			tempInput = (T *) malloc((end - start) * sizeof(T));
 
 
 			printf("index %d \t blockNumKs = %d \t count = %d \t start = %d \t end = %d \n",index,blockNumKs,count,start,end);
 
 			// Sort
-//			if (blockNumKs < end - start) {
-				cudaMemcpy(tempInput, newInput + start, (end - start) * sizeof(T), cudaMemcpyDeviceToHost);
-/*
-				for(int i = 0; i < end - start; i++) {
-					printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
-				}
-*/
+    cubDeviceSort<T>(newInput + start, end - start);
 
-				sort(tempInput,end - start);
-/*
-				for(int i = 0; i < end - start; i++) {
-					printf("tempInput[%d] = %lf \n",i + start,tempInput[i]);
-				}
-*/
-
-			cudaMemcpy(newInput + start, tempInput, (end - start) * sizeof(T), cudaMemcpyHostToDevice);
-//			}
 
 			count += blockNumKs - 1;
-//			index += blockNumKs - 1;
-			free(tempInput);
+
 		}
-//	index += 1;
+
 	}
 }
+
+
+template <typename T>
+__global__ void correctBuckets(uint * d_numUniquePerBlock, T * newInput, T * newInputAlt, uint * bucketBounds, int numOldActive, int numNewActive, double * minimums){
+
+
+
+		__shared__ int blockNumKs;
+		__shared__ int start;
+		__shared__ int end;	
+
+
+		if(blockIdx.x < numOldActive - 1) {
+			if (threadIdx.x < 1){
+				blockNumKs = d_numUniquePerBlock[blockIdx.x + 1] - d_numUniquePerBlock[blockIdx.x];
+				printf("block = %d \t blockNumKs = %d \n",blockIdx.x,blockNumKs);
+			}
+		} else {
+			if (threadIdx.x < 1) {
+				blockNumKs = numNewActive - d_numUniquePerBlock[blockIdx.x];
+				printf("block = %d \t blockNumKs = %d \n",blockIdx.x,blockNumKs);
+			}
+		}
+		syncthreads();
+
+		if (blockNumKs > 1){
+
+			if (threadIdx.x < 1) {
+					start = bucketBounds[blockIdx.x];
+					end = bucketBounds[blockIdx.x + blockNumKs];
+					printf("block = %d \t numKs = %d \t start = %u \t end = %u \n",blockIdx.x,blockNumKs,start,end);
+//					d_printInput(newInput,start,end);
+					//d_sort(newInput + start,end - start);
+			}
+
+			syncthreads();
+
+
+			
+
+  
+
+		}
+}
+
+
+
 
 
 __global__ void printMinimums(double * minimums, int numKs){
@@ -275,4 +305,40 @@ void sort(T* vector, int length){
 		j++;
 	}
 }
+
+
+
+template <typename T>
+__device__ void d_sort(T* vector, int length){
+
+	int j = 0;
+	while (j < length - 1) {
+		for (int i = j + 1; i < length; i++){
+			if (vector[i] < vector[j]) {
+				T temp = vector[i];
+				vector[i] = vector[j];
+				vector[j] = temp;
+			}
+		}
+		j++;
+	}
+}
+
+template <typename T>
+__device__ void d_printInput( T * newInput, int start, int end) {
+	printf("\n *** *** *** *** *** \n");
+	printf("start = %d \t end = %d\n",start,end);
+	for (int i = start; i < end; i+=2) {
+		printf("newInput[%d] = %.10lf \t newInput[%d] = %.10lf from device\n",i,newInput[i],i+1,newInput[i+1]);
+	}
+	printf("\n *** *** *** *** *** \n");
+}
+
+template <typename T>
+__global__ void checkInput(T* newInput, int newInputLength, int tag){
+	for(int i = threadIdx.x; i < newInputLength; i += blockDim.x){
+		if (newInput[i] < 0.00000001) printf("Tag %d \t newInput[%d] = 0\n",tag,i);
+	}
+}
+
 

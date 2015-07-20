@@ -984,8 +984,19 @@ namespace BucketMultiselectNewFindK{
 // *****************************************************
 		for(int test = 0; test < 2; test++){
 
-		
 //		printActive<<<1,1>>>(d_uniqueBuckets,numNewActive);
+
+/*
+		printf("\n *** *** *** *** \t *** *** *** \t *** *** *** *** \n");
+
+		printKVals<<<1,1>>>(d_kVals,numKs);
+		printf("\n *** *** *** *** \n *** * Input * *** \n *** *** *** *** \n");
+		printInput<T><<<1,1>>>(0, newInputLength, newInput);
+	  cudaThreadSynchronize();
+
+		printf("\n *** *** *** *** \t *** *** *** \t *** *** *** *** \n");
+*/
+
 
     // determine the number of buckets per new block
     newNumSmallBuckets = min(11264,numBlocks*numBuckets/numNewActive);
@@ -996,9 +1007,7 @@ std::cout << "oldNumSmallBuckets = " << oldNumSmallBuckets << "     newNumSmallB
 		printf("\n ******** \n iteration %d \n ******** \n",test);
 		printf("\n ******** \n current elements %d \n ******** \n",newInputLength);
 
-    recreateBlocks = (uint) ceil((float)numNewActive/recreateThreads);
-
-
+  recreateBlocks = (uint) ceil((float)numNewActive/recreateThreads);
 
 
 
@@ -1026,8 +1035,8 @@ std::cout << "oldNumSmallBuckets = " << oldNumSmallBuckets << "     newNumSmallB
 
 //printDeviceMemory_uint<<<1,1>>>(d_bucketCount,"dbCount",15);
     cudaDeviceSynchronize();
+    cudaThreadSynchronize();
     SAFEcuda("reassignBuckets");
-
 
 
 		//Update variables for recursion
@@ -1077,7 +1086,6 @@ std::cout << "oldNumSmallBuckets = " << oldNumSmallBuckets << "     newNumSmallB
    }
    Kbounds[numOldActive]=numKs;
 
-
    CUDA_CALL(cudaMemcpy(d_Kbounds, Kbounds, 
                          (numOldActive+1) * sizeof(uint), cudaMemcpyHostToDevice));
 // *******************************
@@ -1097,26 +1105,80 @@ std::cout <<  std::endl;
 std::cout << "numNewActive = " << numNewActive << std::endl;
 */
 
+		printKVals<<<1,1>>>(d_kVals,numKs);
+
 
      newInputLengthAlt = findKbucketsByBlock (d_bucketCount, d_oldReindexCounter, d_Kbounds, d_reindexCounter, d_sums, d_kVals, d_markedBucketFlags, d_numUniquePerBlock, d_uniqueBuckets, &numNewActive, numOldActive, newNumSmallBuckets, numKs);
+    SAFEcuda("findKBucketsByBlock");
 
     cudaThreadSynchronize();
 
-    SAFEcuda("findKBucketsByBlock");
+
+		//printNumUnique<<<1,1>>>(d_numUniquePerBlock, numKs);
+
+	//	printMinimums<<<1,1>>>(d_oldMinimums, numKs);
+
+		//printMinimums<<<1,1>>>(d_newMinimums, numKs);
+
+		printNumUnique<<<1,1>>>(d_numUniquePerBlock,numKs);
+
+
 
     int reducedlength = Reduction<T>(newInput, newInputAlt, d_elementToBucket, d_uniqueBuckets, d_oldReindexCounter, d_numUniquePerBlock, newInputLength, numOldActive, numNewActive);
     SAFEcuda("Reduction");
 
-    CUDA_CALL(cudaMemcpy(reindexCounter, d_reindexCounter, 
-                         numKs * sizeof(uint), cudaMemcpyDeviceToHost));
+		//printKVals<<<1,1>>>(d_kVals,numKs);
 
 
-		checkBuckets(newInputAlt, Kbounds, reindexCounter, numOldActive, numKs, newInputLengthAlt);
+    cudaThreadSynchronize();
 
-/*			for(int i = 0; i < numKs; i++){
+				if (newInputLength < 600){
+				printf("\n *** *** *** *** \n *** * Input * *** \n *** *** *** *** \n");
+				printInput<T><<<1,1>>>(0, newInputLength, newInput);
+		    cudaThreadSynchronize();
+				printf("\n *** *** *** *** \n *** * Alt * *** \n *** *** *** *** \n");
+				printInput<T><<<1,1>>>(0, newInputLengthAlt, newInputAlt);
+		    cudaThreadSynchronize();
+				printf("\n *** *** *** *** \n *** * OldReindex * *** \n *** *** *** *** \n");
+				printReindex<<<1,1>>>(d_oldReindexCounter, numOldActive);
+		    cudaThreadSynchronize();
+				printf("\n *** *** *** *** \n *** * Reindex * *** \n *** *** *** *** \n");
+				printReindex<<<1,1>>>(d_reindexCounter, numNewActive);
+		    cudaThreadSynchronize();
+				printFlag<<<1,1>>>(d_elementToBucket, newInputLength);
+		    cudaThreadSynchronize();
+				}
+
+/*
+			printf("\n ***** New *****\n");
+			printReindex<<<1,1>>>(d_reindexCounter, numKs);
+
+		if (newInputLengthAlt < reducedlength) {
+			printInput<T><<<1,1>>>(newInputLengthAlt, reducedlength, newInputAlt);
+		}
+*/
+
+/*
+		correctBuckets<T><<<numOldActive,1024>>>(d_numUniquePerBlock, newInput, newInputAlt, d_oldReindexCounter, numOldActive, numNewActive, d_newMinimums);
+    SAFEcuda("correctBuckets");
+    cudaThreadSynchronize();
+*/
+
+		checkBuckets(newInputAlt, Kbounds, reindexCounter, numOldActive, numKs, newInputLengthAlt, numNewActive);
+/*
+			for(int i = 0; i < numKs; i++){
 				printf("checkBuckets reindexCounter[%d] = %d\n",i,reindexCounter[i]);
 			}
 */
+
+
+
+
+
+
+
+    CUDA_CALL(cudaMemcpy(reindexCounter, d_reindexCounter, 
+                         numKs * sizeof(uint), cudaMemcpyDeviceToHost));
 
 
 std::cout << "NewInputLengthAlt = " << newInputLengthAlt << "     reducedlength = " << reducedlength << std::endl;
@@ -1124,6 +1186,7 @@ std::cout << "NewInputLengthAlt = " << newInputLengthAlt << "     reducedlength 
 
 
 std::cout << "numNewActive = " << numNewActive << std::endl;
+std::cout << "numOldActive = " << numOldActive << std::endl;
 std::cout <<  std::endl;
 		
 		cudaGetLastError();

@@ -119,7 +119,7 @@ __global__ void findKbucketsByBlock_kernel (uint * d_bucketCount, uint * d_kVals
      }
 			if (blockNumKs > 1) {
 			printf("index = %d \t blockNumKs = %d\n",index,blockNumKs);
-			printf("bucketBounds[%d] = %u \t bucketBounds[%d] = %u \t bucketBounds[%d] = %u \n\n",index,d_reindexsums[index],index + 1,d_reindexsums[index + 1],index + 2,d_reindexsums[index + 2]);
+			printf("bucketBounds[%d] = %u \t bucketBounds[%d] = %u \n",index,d_bucketBounds[index],index + 1,d_bucketBounds[index + 1]);
      }
 
 		syncthreads();
@@ -283,6 +283,7 @@ __global__ void ReductionFlags (uint * d_elementToBucket, uint* d_uniqueBuckets,
      // if the current bucket is active, flag as 1 otherwise flag as 0 using elementToBucket as flag vector
      if (temp==activeBuckets[high]) {
        d_elementToBucket[index]=1;
+//       d_elementToBucket[index] = numUniquePerBlock;
      } else {
        d_elementToBucket[index]=0;
      } // end if else temp==active
@@ -391,9 +392,45 @@ __global__ void printSlopes(double* d_newSlopes,double* d_oldSlopes, int numKs){
 
 __global__ void printReindex(uint* d_reindexCounter, int numKs){
 		if (threadIdx.x + blockIdx.x == 0){
-			for(int i = 0; i < numKs; i++){
-				printf("reindexCounter[%d] = %d\n",i,d_reindexCounter[i]);
+			for(int i = 0; i < numKs; i+=2){
+				printf("reindexCounter[%d] = %d\t",i,d_reindexCounter[i]);
+				printf("reindexCounter[%d] = %d\n",i+1,d_reindexCounter[i+1]);
 			}
+		}
+}
+
+
+__global__ void printNumUnique(uint* d_numUnique, int numKs){
+		if (threadIdx.x + blockIdx.x == 0){
+			//int count = 0;
+			for(int i = 0; i < numKs; i++){
+				printf("numUnique[%d] = %d\n",i,d_numUnique[i]);
+				//d_numUnique[i] = d_numUnique[i] - i - count;
+				//if (d_numUnique[i] > count) count = d_numUnique[i];
+			}
+		}
+}
+
+__global__ void multiBuckets(uint* d_numUnique, int numKs){
+		if (threadIdx.x + blockIdx.x == 0){
+			int count = 0;
+			for(int i = 0; i < numKs; i++){
+				printf("numUnique[%d] = %d\n",i,d_numUnique[i]);
+				d_numUnique[i] = d_numUnique[i] - i - count;
+				if (d_numUnique[i] > count) count = d_numUnique[i];
+			}
+		}
+}
+
+
+__global__ void printBucketCount(uint* d_bucketCount, int length){
+		if (threadIdx.x + blockIdx.x == 0){
+			int sum = 0;
+			for(int i = 0; i < length; i++){
+				//printf("bucketCount[%d] = %d\n",i,d_bucketCount[i]);
+				sum += d_bucketCount[i];
+			}
+			printf("sum = %d\n",sum);
 		}
 }
 
@@ -401,6 +438,14 @@ __global__ void printKbounds(uint* d_Kbounds, int numKs){
 		if (threadIdx.x + blockIdx.x == 0){
 			for(int i = 0; i < numKs; i++){
 				printf("Kbounds[%d] = %d\n",i,d_Kbounds[i]);
+			}
+		}
+}
+
+__global__ void printKVals(uint* d_kVals, int numKs){
+		if (threadIdx.x + blockIdx.x == 0){
+			for(int i = 0; i < numKs; i+=3){
+				printf("kVals[%d] = %d\tkVals[%d] = %d\tkVals[%d] = %d\n",i,d_kVals[i],i+1,d_kVals[i+1],i+2,d_kVals[i+2]);
 			}
 		}
 }
@@ -440,11 +485,24 @@ __global__ void printBuckets(int newInputLength, uint * d_elementToBucket, doubl
 
 }
 
-template <typename T>
-__global__ void printInput(int newInputLength, T * newInput) {
 
-	for (int i = 1; i < newInputLength; i++) {
-			if (newInput[i] < newInput[i - 1])	printf("newInput[%d] = %.10lf \t newInput[%d] = %.10lf\n",i,newInput[i],i - 1,newInput[i - 1]);
+
+__global__ void printFlag(uint * d_elementToBucket, int length) {
+
+	for (int i = threadIdx.x; i < length; i += blockDim.x) {
+			printf("elementToBucket[%d] = %u\n",i,d_elementToBucket[i]);
+
+	}
+
+}
+
+
+template <typename T>
+__global__ void printInput(int start, int end, T * newInput) {
+
+	for (int i = start; i < end; i+=2) {
+		printf("newInput[%d] = %.15lf \t",i,newInput[i]);
+		printf("newInput[%d] = %.15lf \n",i+1,newInput[i+1]);
 	}
 }
 
