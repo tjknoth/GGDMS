@@ -161,46 +161,30 @@ namespace BucketMultiselectNewFindK{
     return 0;
   }
 
-  /* This function implements a recursive quicksort
-     
-     arr: the array to be sorted
-     left: the left boundary of the sort
-     right: the right boundary of the sort
-   */
   template <typename T>
-  void quicksort (T* arr, int left, int right) {
-    int i = left, j = right;
-    T temp;
-    T pivot = arr[(int) ((left + right) / 2)];
-    
-    // Partition the array such that everything left of the pivot is less than pivot
-    //   and everything right of the pivot is greater than the pivot
-    while (i <= j) {
-      while (arr[i] < pivot)
-        i++;
-      while (arr[j] > pivot)
-        j--;
-      if (i <= j) {
-        temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
-        i++;
-        j--;
-      }
+  struct maxMin {
+    T minimum;
+    T maximum;
+  };
+
+  template <typename T>
+  maxMin<T> vecMaxMin (T* arr, int world_size) {
+    T min = arr[world_size];
+    T max = arr[0];
+    maxMin<T> result;
+
+    for (int i = 1; i < world_size; i++) {
+      if (arr[i] > max)
+        max = arr[i];
+      if (arr[world_size + i] < min)
+        min = arr[world_size + i];
     }
-    if (left < j)
-      quicksort (arr, left, j);
-    if (i < right)
-      quicksort (arr, i, right);
+    result.minimum = min;
+    result.maximum = max;
+    return result;
   }
   
-  // /* This is a helper partition function for the recursive quicksort procedure.
 
-  //  */
-  // template <typename T>
-  // int partition (T* arr, int left, int right) {
-    
-  // }
 
   // **********************************************************
   // ***********  sort  phase differs by type  ****************
@@ -771,8 +755,6 @@ namespace BucketMultiselectNewFindK{
     /// ***********************************************************
     timing(0,1);
 
-    // SHOULD THIS HAPPEN DISTRIBUTED?
-
     //find max and min with thrust
    
     T maximum, minimum;
@@ -827,9 +809,9 @@ namespace BucketMultiselectNewFindK{
 
     // find the global minimum and maximum, send to all nodes
     if (world_rank == 0) {
-      quicksort (maxMinArr, 0, world_size * 2 - 1);
-      minimum = maxMinArr[0];
-      maximum = maxMinArr[world_size * 2 - 1];
+      maxMin<T> result = vecMaxMin<T> (maxMinArr, world_size);
+      maximum = result.maximum;
+      minimum = result.minimum;
       for (int i = 1; i < world_size; i++) {
         switch (datatype) {
         case 0:
@@ -862,16 +844,15 @@ namespace BucketMultiselectNewFindK{
         MPI_Recv (&maximum, 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         MPI_Recv (&minimum, 1, MPI_UNSIGNED, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         break;
-      }
-    }
+      } // end switch
+    } // end if/else
 
-    //if the max and the min are the same, then we are done
-    // if (maximum == minimum) {
-    //   for (register int i = 0; i < numKs; i++) 
-    //     output[i] = minimum;
-      
-    //   return 1;
-    // }
+    // if the max and the min are the same, then we are done
+    if (maximum == minimum) {
+      for (register int i = 0; i < numKs; i++) 
+        output[i] = minimum;
+      return 1;
+    }
     
 
     /// ***********************************************************
@@ -1089,7 +1070,6 @@ namespace BucketMultiselectNewFindK{
     MPI_Barrier(MPI_COMM_WORLD);
 
     SAFEcuda("assignSmartBucket");
-  
 
     CUDA_CALL(cudaMemcpy(slopes, d_slopes, numPivots * sizeof(double), 
                          cudaMemcpyDeviceToHost));  
@@ -1325,7 +1305,6 @@ namespace BucketMultiselectNewFindK{
     numNewActive = numUniqueBuckets;
     oldNumSmallBuckets = numBuckets/numOldActive;
 
-
     int recreateThreads = 128;
 
     // *****************************************************
@@ -1412,7 +1391,6 @@ namespace BucketMultiselectNewFindK{
     CUDA_CALL(cudaMemcpy(d_Kbounds, Kbounds, 
                          (numOldActive+1) * sizeof(uint), cudaMemcpyHostToDevice));
     // *******************************
-    
     // Find active buckets and new reduced length and send out to all nodes
     if (world_rank == 0) {
       newInputLengthAlt = findKbucketsByBlock (d_bucketCount, d_oldReindexCounter, d_Kbounds, d_reindexCounter
@@ -1424,18 +1402,29 @@ namespace BucketMultiselectNewFindK{
       CUDA_CALL(cudaMemcpy(h_numUniquePerBlock, d_numUniquePerBlock, numKs * sizeof (uint), cudaMemcpyDeviceToHost)); 
       CUDA_CALL(cudaMemcpy(kVals, d_kVals, numKs * sizeof(uint), cudaMemcpyDeviceToHost));
       for (int i = 1; i < world_size; i++) {
-        MPI_Send(uniqueBuckets, numNewActive, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
-        MPI_Send(&newInputLengthAlt, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
-        MPI_Send(h_numUniquePerBlock, numKs, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&numNewActive, 1, MPI_INT, i, 0, MPI_COMM_WORLD);
       }
     }
     else {
+      MPI_Recv(&numNewActive, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    } // end if/else
+
+    
+    if (world_rank == 0) {
+      for (int i = 1; i < world_size; i++) {
+        MPI_Send(uniqueBuckets, numNewActive, MPI_UNSIGNED, i, 0, MPI_COMM_WORLD);
+        MPI_Send(&newInputLengthAlt, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
+        MPI_Send(h_numUniquePerBlock, numKs, MPI_UNSIGNED, i, 2, MPI_COMM_WORLD);
+      }
+    } 
+    else {
       MPI_Recv(uniqueBuckets, numNewActive, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      MPI_Recv(&newInputLengthAlt, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-      MPI_Recv(h_numUniquePerBlock, numKs, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(&newInputLengthAlt, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(h_numUniquePerBlock, numKs, MPI_UNSIGNED, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } // end if/else
 
     SAFEcuda("findKBucketsByBlock");
+
     MPI_Barrier (MPI_COMM_WORLD);
     
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, numNewActive * sizeof(uint), cudaMemcpyHostToDevice));
