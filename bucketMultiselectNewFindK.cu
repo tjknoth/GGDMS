@@ -805,8 +805,6 @@ namespace BucketMultiselectNewFindK{
       } // end for
     } //end else
 
-    MPI_Barrier (MPI_COMM_WORLD);
-
     // find the global minimum and maximum, send to all nodes
     if (world_rank == 0) {
       maxMin<T> result = vecMaxMin<T> (maxMinArr, world_size);
@@ -910,8 +908,6 @@ namespace BucketMultiselectNewFindK{
     }
     else
       h_totalBucketCount = (uint*) malloc (totalBucketSize);
-      
-    MPI_Barrier(MPI_COMM_WORLD);
 
     // array of kth buckets
     int numUniqueBuckets;
@@ -1042,8 +1038,6 @@ namespace BucketMultiselectNewFindK{
         MPI_Recv(slopes, numPivots, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } // end else
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
     CUDA_CALL(cudaMemcpy(d_slopes, slopes, numPivots * sizeof(double), 
                          cudaMemcpyHostToDevice));  
     CUDA_CALL(cudaMemcpy(d_pivots, pivots, numPivots* sizeof(T), 
@@ -1067,8 +1061,6 @@ namespace BucketMultiselectNewFindK{
       (d_vector, length, numBuckets, d_slopes, d_pivots, d_pivottree, numPivots, 
        d_elementToBucket, d_bucketCount, offset);
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
     SAFEcuda("assignSmartBucket");
 
     CUDA_CALL(cudaMemcpy(slopes, d_slopes, numPivots * sizeof(double), 
@@ -1089,8 +1081,6 @@ namespace BucketMultiselectNewFindK{
                   , i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       }
     } // end if/else
-    
-    MPI_Barrier(MPI_COMM_WORLD);
 
     // Combine entries across h_totalBucketCount to form a single bucketCount array
     if (world_rank == 0) {
@@ -1108,8 +1098,6 @@ namespace BucketMultiselectNewFindK{
     /// **** and update their respective indices
     /// ***********************************************************
     timing(0,4);
-
-    MPI_Barrier(MPI_COMM_WORLD);
 
     int totalNewInputLength;
     if (world_rank == 0) {
@@ -1160,8 +1148,6 @@ namespace BucketMultiselectNewFindK{
       MPI_Recv(reindexCounter, numKs, MPI_UNSIGNED, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
     // locally calculate newInputLength
     int sumsRowIndex = numBuckets * (numBlocks-1);
     CUDA_CALL(cudaMemcpy(d_localBucketCount, h_totalBucketCount, totalBucketSize, cudaMemcpyHostToDevice));
@@ -1181,8 +1167,6 @@ namespace BucketMultiselectNewFindK{
 
     newInputLength = localReindexCounter[numUniqueBuckets-1]
       + h_localBucketCount[kthBuckets[numKs-1]];
-
-    MPI_Barrier(MPI_COMM_WORLD);
 
     // reindex the counts locally and globally
     CUDA_CALL(cudaMalloc(&d_reindexCounter, numKs * sizeof(uint)));
@@ -1207,8 +1191,6 @@ namespace BucketMultiselectNewFindK{
     }
     SAFEcuda("reindexCounts");
 
-    MPI_Barrier(MPI_COMM_WORLD);
-
     cudaDeviceSynchronize();
 
     CUDA_CALL(cudaMemcpy(reindexCounter, d_reindexCounter, numKs * sizeof (uint), cudaMemcpyDeviceToHost));
@@ -1231,8 +1213,6 @@ namespace BucketMultiselectNewFindK{
       CUDA_CALL(cudaMemcpy (d_bucketCount, h_trueBucketCount, totalBucketSize, cudaMemcpyHostToDevice));
       CUDA_CALL(cudaMemcpy (d_reindexCounter, reindexCounter, numKs * sizeof (uint), cudaMemcpyHostToDevice));
     }
-
-    MPI_Barrier(MPI_COMM_WORLD);
 
     timing(1,4);
     /// ***********************************************************
@@ -1408,7 +1388,8 @@ namespace BucketMultiselectNewFindK{
     else {
       MPI_Recv(&numNewActive, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } // end if/else
-
+    
+    MPI_Barrier(MPI_COMM_WORLD);
     
     if (world_rank == 0) {
       for (int i = 1; i < world_size; i++) {
@@ -1424,8 +1405,6 @@ namespace BucketMultiselectNewFindK{
     } // end if/else
 
     SAFEcuda("findKBucketsByBlock");
-
-    MPI_Barrier (MPI_COMM_WORLD);
     
     CUDA_CALL(cudaMemcpy(d_uniqueBuckets, uniqueBuckets, numNewActive * sizeof(uint), cudaMemcpyHostToDevice));
     CUDA_CALL(cudaMemcpy(d_numUniquePerBlock, h_numUniquePerBlock, numKs * sizeof(uint), cudaMemcpyHostToDevice));
@@ -1466,7 +1445,6 @@ namespace BucketMultiselectNewFindK{
     else
       CUDA_CALL(cudaMemcpy (totalNewInput, newInputAlt, reducedLength * sizeof(T), cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
-    MPI_Barrier(MPI_COMM_WORLD);
     
     // Combine the reduced vectors into a single input vector for sorting
     if (world_rank != 0) {
@@ -1530,7 +1508,13 @@ namespace BucketMultiselectNewFindK{
     }
     
     SAFEcuda("sort_phase global");
-
+    
+    if (world_rank == 0) {
+      free (maxMinArr);
+      free(totalNewInput);
+      cudaFree(d_totalBucketCount);
+      cudaFree(d_totalNewInput);
+    }
     //free all used memory
     cudaFree(d_pivots);
     cudaFree(d_pivottree);
@@ -1538,19 +1522,25 @@ namespace BucketMultiselectNewFindK{
     free(h_bucketCount);
     cudaFree(d_bucketCount);
     cudaFree(d_uniqueBuckets); 
-    //cudaFree(d_markedBucketFlags); 
-    //cudaFree(d_sums); 
+    cudaFree(d_markedBucketFlags); 
+    cudaFree(d_sums); 
     cudaFree(d_reindexCounter);
-    //cudaFree(d_oldReindexCounter);
-    //cudaFree(d_newMinimums);
-    //cudaFree(d_newSlopes);
+    cudaFree(d_oldReindexCounter);
+    cudaFree(d_newMinimums);
+    cudaFree(d_newSlopes);
     cudaFree(newInput); 
- 
+    free(h_localBucketCount);
+    free(h_trueBucketCount);
+    free(h_totalBucketCount);
+    free(localReindexCounter);
+    free(h_newInput);
+    cudaFree(d_localBucketCount);
+    cudaFree(d_localReindexCounter);
   
     cudaFree(d_elementToBucket);  
     cudaFree(d_kIndices); 
     cudaFree(d_kVals); 
-    //cudaFree(newInputAlt);
+    cudaFree(newInputAlt);
     free (kIndices - kOffsetMin);
 
     /// ***********************************************************

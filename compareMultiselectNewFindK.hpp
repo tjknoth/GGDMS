@@ -61,14 +61,17 @@ namespace CompareMultiselectNewFindK {
 
     // allocate space for operations
     T *h_vec, *h_vec_copy;
-    float timeArray[NUMBEROFALGORITHMS][numTests];
-    T * resultsArray[NUMBEROFALGORITHMS][numTests];
+    T *** resultsArray = (T***) malloc (NUMBEROFALGORITHMS * sizeof (T**));
+    float** timeArray = (float**) malloc (NUMBEROFALGORITHMS * sizeof (float*));
+    for (int i = 0; i < NUMBEROFALGORITHMS; i++) {
+      timeArray[i] = (float*) malloc (numTests * sizeof(float));
+      resultsArray[i] = (T**) malloc (numTests * sizeof(float));
+    }
     float totalTimesPerAlgorithm[NUMBEROFALGORITHMS];
-    uint winnerArray[numTests];
-    uint timesWon[NUMBEROFALGORITHMS];
+    uint* winnerArray = (uint *) malloc (numTests * sizeof (uint));
+    uint* timesWon = (uint*) malloc (NUMBEROFALGORITHMS * sizeof (uint));
     int i,j,m,x;
     int runOrder[NUMBEROFALGORITHMS];
-
     unsigned long long seed;
     results_t<T> *temp;
     ofstream fileCsv;
@@ -82,7 +85,7 @@ namespace CompareMultiselectNewFindK {
       {&timeSortAndChooseMultiselect_a<T>,
        &timeBucketMultiselect_a<T>,
        &timeBucketMultiselectNewFindK_a<T>};
-       //, &timeBucketMultiselect_thrust<T>};
+    //, &timeBucketMultiselect_thrust<T>};
   
     ptrToGeneratingFunction *arrayOfGenerators;
     char** namesOfGeneratingFunctions;
@@ -92,10 +95,10 @@ namespace CompareMultiselectNewFindK {
     namesOfGeneratingFunctions = returnNamesOfGenerators<T>();
     arrayOfGenerators = (ptrToGeneratingFunction *) returnGenFunctions<T>();
 
-    if (world_rank == 0)
+    if (world_rank == 0) 
       printf("Files will be written to %s\n", fileNamecsv);
     fileCsv.open(fileNamecsv, ios_base::app);
-  
+    
     //zero out the totals and times won
     bzero(totalTimesPerAlgorithm, NUMBEROFALGORITHMS * sizeof(uint));
     bzero(timesWon, NUMBEROFALGORITHMS * sizeof(uint));
@@ -120,13 +123,9 @@ namespace CompareMultiselectNewFindK {
   /***********************************************/
 
 
-    // Is this necessary?
-    MPI_Barrier(MPI_COMM_WORLD);
-
     for(i = 0; i < numTests; i++) {
       gettimeofday(&t1, NULL);
       seed = t1.tv_usec * t1.tv_sec;
-      
       if (world_rank == 0) {
         for(m = 0; m < NUMBEROFALGORITHMS;m++)
           runOrder[m] = m;
@@ -176,7 +175,7 @@ namespace CompareMultiselectNewFindK {
       // allocate h_vecChunk to receive the chunk of h_vec
       T* h_vecChunk = (T*) malloc (newSize * sizeof(T));
       int recv = sendcounts[world_rank];
-
+      MPI_Barrier(MPI_COMM_WORLD);
       switch (datatype) {
       case 0:
         MPI_Scatterv (h_vec, sendcounts, displs, MPI_FLOAT, h_vecChunk, recv, MPI_FLOAT, 0, MPI_COMM_WORLD);  
@@ -189,8 +188,6 @@ namespace CompareMultiselectNewFindK {
         break;
       }
 
-      MPI_Barrier(MPI_COMM_WORLD);
-
       winnerArray[i] = 0;
       float currentWinningTime = INFINITY;
       //run the various timing functions
@@ -199,13 +196,11 @@ namespace CompareMultiselectNewFindK {
         if(algorithmsToTest[j]){
 
           //run timing function j. If it is the distributed multiselect, use different arguments.
-          //printf("TESTING: %u on processor rank %d of %d, named %s\n", j, world_rank, world_size, processor_name);
           if (j == 2)
             temp = arrayOfTimingFunctions[j](h_vecChunk, newSize, kVals, numKs, world_rank, world_size, processor_name, datatype, size);
           else if (world_rank == 0) {
             // Must take size as a parameter twice to fit the template
             temp = arrayOfTimingFunctions[j](h_vec_copy, size, kVals, numKs, world_rank, world_size, processor_name, datatype, size);
-            //printf ("finished on %s\n", processor_name);
           }
 
           if (world_rank == 0) {
@@ -218,16 +213,13 @@ namespace CompareMultiselectNewFindK {
               currentWinningTime = temp->time;
               winnerArray[i] = j;
             }
-            //printf ("successful on %s\n", processor_name);
           }
-
           //perform clean up 
           if (world_rank == 0 && x != 2) {
             //free (temp);
             memcpy(h_vec_copy, h_vec, size * sizeof(T));
           }
         }
-        MPI_Barrier(MPI_COMM_WORLD);
       }
 
       curandDestroyGenerator(generator);
@@ -236,8 +228,6 @@ namespace CompareMultiselectNewFindK {
           if(algorithmsToTest[x])
             fileCsv << namesOfMultiselectTimingFunctions[x] << "," << timeArray[x][i] << ",";
       }
-
-      //printf ("MORE successful on %s\n", processor_name);
 
       if (world_rank == 0) {
         // check for errors, and output information to recreate problem
@@ -266,31 +256,30 @@ namespace CompareMultiselectNewFindK {
 
         fileCsv << flag << "\n";
       }
- 
-      if (world_rank == 0) {
-        //calculate the total time each algorithm took
-        for(i = 0; i < numTests; i++)
-          for(j = 0; j < NUMBEROFALGORITHMS;j++)
-            if(algorithmsToTest[j])
-              totalTimesPerAlgorithm[j] += timeArray[j][i];
+    } // end for
+    if (world_rank == 0) {
+      //calculate the total time each algorithm took
+      for(i = 0; i < numTests; i++)
+        for(j = 0; j < NUMBEROFALGORITHMS;j++)
+          if(algorithmsToTest[j])
+            totalTimesPerAlgorithm[j] += timeArray[j][i];
 
-        //count the number of times each algorithm won. 
-        for(i = 0; i < numTests;i++)
-          timesWon[winnerArray[i]]++;
+      //count the number of times each algorithm won. 
+      for(i = 0; i < numTests; i++) {
+        timesWon[winnerArray[i]]++;
+      }
+      printf("\n\n");
+        
+      //print out the average times
 
-        printf("\n\n");
+      for(i = 0; i < NUMBEROFALGORITHMS; i++)
+        if(algorithmsToTest[i])
+          printf("%-20s averaged: %f ms\n", namesOfMultiselectTimingFunctions[i], totalTimesPerAlgorithm[i] / numTests);
 
-        //print out the average times
-
-        for(i = 0; i < NUMBEROFALGORITHMS; i++)
-          if(algorithmsToTest[i])
-            printf("%-20s averaged: %f ms\n", namesOfMultiselectTimingFunctions[i], totalTimesPerAlgorithm[i] / numTests);
-
-        for(i = 0; i < NUMBEROFALGORITHMS; i++)
-          if(algorithmsToTest[i])
-            printf("%s won %u times\n", namesOfMultiselectTimingFunctions[i], timesWon[i]);
-      } // end if (world_rank == 0)
-    }
+      for(i = 0; i < NUMBEROFALGORITHMS; i++)
+        if(algorithmsToTest[i])
+          printf("%s won %u times\n", namesOfMultiselectTimingFunctions[i], timesWon[i]);
+    } // end if (world_rank == 0)
 
     // free results
     if ((world_rank == 0 && x != 2) || (x == 2)) {
@@ -299,7 +288,6 @@ namespace CompareMultiselectNewFindK {
           if(algorithmsToTest[m])
             free(resultsArray[m][i]);
     }
-
     //free h_vec and h_vec_copy
     if ((world_rank == 0 && x != 2) || (x == 2)) {
       if(data == NULL) 
@@ -349,8 +337,6 @@ namespace CompareMultiselectNewFindK {
       else {
         MPI_Recv(arrayOfKs, stopK + 1, MPI_UNSIGNED, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       }
-
-      MPI_Barrier(MPI_COMM_WORLD);
 
       for(i = startK; i <= stopK; i+=kJump) {
         cudaDeviceReset();
