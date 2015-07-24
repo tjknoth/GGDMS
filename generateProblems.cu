@@ -1,3 +1,5 @@
+// -*- c++ -*-
+
 /* Copyright 2012 Jeffrey Blanchard, Erik Opavsky, and Emircan Uysaler
  * Copyright 2011 Russel Steinbach, Jeffrey Blanchard, Bradley Gordon,
  *   and Toluwaloju Alabi
