@@ -1510,6 +1510,7 @@ namespace BucketMultiselectNewFindK{
     SAFEcuda("sort_phase global");
     
     if (world_rank == 0) {
+      printf("size = %d",newInputLengthAlt);
       free (maxMinArr);
       free(totalNewInput);
       cudaFree(d_totalBucketCount);
