@@ -1020,6 +1020,19 @@ namespace BucketMultiselectNewFindK{
       cudaDeviceSynchronize();
       SAFEcuda("recreateBuckets");
 
+      
+      if (test > 1) {
+        //printf ("d_reindexCounter\n");
+        //printNumUnique<<<numBlocks, threadsPerBlock>>>(d_reindexCounter, numNewActive);
+        //printf ("d_numUniquePerBlock\n");
+        //printNumUnique2<<<numBlocks, threadsPerBlock>>>(d_numUniquePerBlock, numNewActive);
+        //printf ("d_KBounds\n");
+        //printNumUnique<<<numBlocks, threadsPerBlock>>>(d_Kbounds, numNewActive);
+        sortBlock<T><<<numOldActive, threadsPerBlock / 2
+          , 100 * sizeof(T)>>>(newInput, newInputLength, d_reindexCounter, numOldActive, d_numUniquePerBlock, d_uniqueBuckets, d_oldMinimums, d_bucketCount, numKs, d_Kbounds); 
+      }
+      cudaDeviceSynchronize();
+      SAFEcuda("sortBlock");
 
       //printDeviceMemory_uint<<<1,1>>>(d_bucketCount,"dbCount",15);
 
@@ -1117,15 +1130,6 @@ namespace BucketMultiselectNewFindK{
 
       printNumUnique<<<1,1>>>(d_numUniquePerBlock,numKs);
 
-      
-      if (test > 1) {
-        printNumUnique<<<numBlocks, threadsPerBlock>>>(d_reindexCounter, numNewActive);
-        printNumUnique2<<<numBlocks, threadsPerBlock>>>(d_Kbounds, numNewActive);
-        sortBlock<T><<<numOldActive, threadsPerBlock
-          , 100 * sizeof(T)>>>(newInput, newInputLength, d_oldReindexCounter, numOldActive, d_Kbounds, d_uniqueBuckets, d_oldMinimums, d_bucketCount, numKs); 
-      }
-      cudaDeviceSynchronize();
-      SAFEcuda("sortBlock");
 
       pointerSwap<double>(&d_newMinimums,&d_oldMinimums);
 
@@ -1230,6 +1234,8 @@ namespace BucketMultiselectNewFindK{
     cudaFree(d_oldMinimums);
     cudaFree(d_numUniquePerBlock);
     cudaFree(d_Kbounds);
+    cudaFree(d_oldSlopes); 
+    cudaFree(d_newSlopes);
 
     // OLD STUFF BEGINS
     timing(1,6);
@@ -1266,8 +1272,7 @@ namespace BucketMultiselectNewFindK{
     cudaFree(newInput); 
     cudaFree(newInputAlt);
     free (kIndices - kOffsetMin);
-    cudaFree(d_oldSlopes); 
-    cudaFree(d_newSlopes);
+
 
   
 
