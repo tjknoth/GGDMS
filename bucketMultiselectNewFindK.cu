@@ -1001,10 +1001,10 @@ namespace BucketMultiselectNewFindK{
       newNumSmallBuckets = min(11264,numBlocks*numBuckets/numNewActive);
       //    newNumSmallBuckets = numBuckets/numNewActive;
 
-      std::cout << "oldNumSmallBuckets = " << oldNumSmallBuckets << "     newNumSmallBuckets = " << newNumSmallBuckets << std::endl;
+      // std::cout << "oldNumSmallBuckets = " << oldNumSmallBuckets << "     newNumSmallBuckets = " << newNumSmallBuckets << std::endl;
 
-      printf("\n ******** \n iteration %d \n ******** \n",test);
-      printf("\n ******** \n current elements %d \n ******** \n",newInputLength);
+      // printf("\n ******** \n iteration %d \n ******** \n",test);
+      // printf("\n ******** \n current elements %d \n ******** \n",newInputLength);
 
       recreateBlocks = (uint) ceil((float)numNewActive/recreateThreads);
 
@@ -1023,11 +1023,12 @@ namespace BucketMultiselectNewFindK{
       
       if (test > 1) {
         //printf ("d_reindexCounter\n");
-        //printNumUnique<<<numBlocks, threadsPerBlock>>>(d_reindexCounter, numNewActive);
+        //printNumUnique<<<numBlocks, threadsPerBlock>>>(d_numUniquePerBlock, numNewActive);
         //printf ("d_numUniquePerBlock\n");
-        //printNumUnique2<<<numBlocks, threadsPerBlock>>>(d_numUniquePerBlock, numNewActive);
+        //printNumUnique2<<<numBlocks, threadsPerBlock>>>(d_oldMinimums, numNewActive);
         //printf ("d_KBounds\n");
         //printNumUnique<<<numBlocks, threadsPerBlock>>>(d_Kbounds, numNewActive);
+        //printf ("numNewActive = %d, numOldActive = %d\n", numNewActive, numOldActive);
         sortBlock<T><<<numOldActive, threadsPerBlock / 2
           , 100 * sizeof(T)>>>(newInput, newInputLength, d_reindexCounter, numOldActive, d_numUniquePerBlock, d_uniqueBuckets, d_oldMinimums, d_bucketCount, numKs, d_Kbounds); 
       }
@@ -1112,7 +1113,7 @@ namespace BucketMultiselectNewFindK{
         std::cout << "numNewActive = " << numNewActive << std::endl;
       */
 
-      printKVals<<<1,1>>>(d_kVals,numKs);
+      //printKVals<<<1,1>>>(d_kVals,numKs);
 
       newInputLengthAlt = findKbucketsByBlock (d_bucketCount, d_oldReindexCounter, d_Kbounds, d_reindexCounter, d_sums, d_kVals
                                                , d_markedBucketFlags, d_numUniquePerBlock, d_uniqueBuckets, &numNewActive
@@ -1128,7 +1129,7 @@ namespace BucketMultiselectNewFindK{
 
       //printMinimums<<<1,1>>>(d_newMinimums, numKs);
 
-      printNumUnique<<<1,1>>>(d_numUniquePerBlock,numKs);
+      //printNumUnique<<<1,1>>>(d_numUniquePerBlock,numKs);
 
 
       pointerSwap<double>(&d_newMinimums,&d_oldMinimums);
@@ -1141,22 +1142,22 @@ namespace BucketMultiselectNewFindK{
 
       cudaThreadSynchronize();
 
-      if (newInputLength < 600){
-        printf("\n *** *** *** *** \n *** * Input * *** \n *** *** *** *** \n");
-        printInput<T><<<1,1>>>(0, newInputLength, newInput);
-        cudaThreadSynchronize();
-        printf("\n *** *** *** *** \n *** * Alt * *** \n *** *** *** *** \n");
-        printInput<T><<<1,1>>>(0, newInputLengthAlt, newInputAlt);
-        cudaThreadSynchronize();
-        printf("\n *** *** *** *** \n *** * OldReindex * *** \n *** *** *** *** \n");
-        printReindex<<<1,1>>>(d_oldReindexCounter, numOldActive);
-        cudaThreadSynchronize();
-        printf("\n *** *** *** *** \n *** * Reindex * *** \n *** *** *** *** \n");
-        printReindex<<<1,1>>>(d_reindexCounter, numNewActive);
-        cudaThreadSynchronize();
-        printFlag<<<1,1>>>(d_elementToBucket, newInputLength);
-        cudaThreadSynchronize();
-      }
+      // if (newInputLength < 600){
+      //   printf("\n *** *** *** *** \n *** * Input * *** \n *** *** *** *** \n");
+      //   printInput<T><<<1,1>>>(0, newInputLength, newInput);
+      //   cudaThreadSynchronize();
+      //   printf("\n *** *** *** *** \n *** * Alt * *** \n *** *** *** *** \n");
+      //   printInput<T><<<1,1>>>(0, newInputLengthAlt, newInputAlt);
+      //   cudaThreadSynchronize();
+      //   printf("\n *** *** *** *** \n *** * OldReindex * *** \n *** *** *** *** \n");
+      //   printReindex<<<1,1>>>(d_oldReindexCounter, numOldActive);
+      //   cudaThreadSynchronize();
+      //   printf("\n *** *** *** *** \n *** * Reindex * *** \n *** *** *** *** \n");
+      //   printReindex<<<1,1>>>(d_reindexCounter, numNewActive);
+      //   cudaThreadSynchronize();
+      //   printFlag<<<1,1>>>(d_elementToBucket, newInputLength);
+      //   cudaThreadSynchronize();
+      // }
 
       /*
         printf("\n ***** New *****\n");
@@ -1173,7 +1174,7 @@ namespace BucketMultiselectNewFindK{
         cudaThreadSynchronize();
       */
 
-      checkBuckets(newInputAlt, Kbounds, reindexCounter, numOldActive, numKs, newInputLengthAlt, numNewActive);
+      //checkBuckets(newInputAlt, Kbounds, reindexCounter, numOldActive, numKs, newInputLengthAlt, numNewActive);
       /*
         for(int i = 0; i < numKs; i++){
         printf("checkBuckets reindexCounter[%d] = %d\n",i,reindexCounter[i]);
@@ -1190,13 +1191,13 @@ namespace BucketMultiselectNewFindK{
                            numKs * sizeof(uint), cudaMemcpyDeviceToHost));
 
 
-      std::cout << "NewInputLengthAlt = " << newInputLengthAlt << "     reducedlength = " << reducedlength << std::endl;
+      // std::cout << "NewInputLengthAlt = " << newInputLengthAlt << "     reducedlength = " << reducedlength << std::endl;
 
 
 
-      std::cout << "numNewActive = " << numNewActive << std::endl;
-      std::cout << "numOldActive = " << numOldActive << std::endl;
-      std::cout <<  std::endl;
+      // std::cout << "numNewActive = " << numNewActive << std::endl;
+      // std::cout << "numOldActive = " << numOldActive << std::endl;
+      // std::cout <<  std::endl;
 		
       cudaGetLastError();
 

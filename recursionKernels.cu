@@ -91,7 +91,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 
 
 
-  deviceTag(2);
+  //deviceTag(2);
   syncthreads();
   // declare shared memory counter as counts
   extern __shared__ uint counts[];
@@ -103,7 +103,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 
   syncthreads();
 
-  deviceTag(1);
+  //deviceTag(1);
 
   // Since slope, minimum, and blockOffset are the same for every element in 
   // the same block, copy them to shared memory for fast access
@@ -161,7 +161,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
     // compute the local bucket via the linear projection
     localBucket = (int) (((double)num - minimum) * slope);
     if (localBucket > newNumSmallBuckets - 1) {
-      printf("bucket = %d index %d start %d end %d \nnum %d = %.15f min = %.15f \n\n",localBucket,blockIndex,blockStart,blockEnd,i,num,minimum);
+      //printf("bucket = %d index %d start %d end %d \nnum %d = %.15f min = %.15f \n\n",localBucket,blockIndex,blockStart,blockEnd,i,num,minimum);
       //   double biggest = newNumSmallBuckets/slope+minimum;
       //   printf("localBucket = %d, newNumSmallBuckets = %d    num = %f   minimum = %f  slope =%f maximum = %f\n",localBucket,newNumSmallBuckets,num,minimum,slope,biggest);
     }
