@@ -541,15 +541,15 @@ __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBl
       //printf ("added %d from %d\n", d_bucketCount[uniqueBuckets[blockOffset + i]], uniqueBuckets[blockOffset + i]);
     }
     int blockStart = d_bucketBounds[blockOffset] - 1;
-    if (threadId < 1)
-      printf ("block = %d, blockLength = %d, firstBucket = %d, blockOffset = %d, blockStart = %d, numKs = %d\n", blockId, blockLength, firstBucket, blockOffset, blockStart, numKsPerBlock); 
+    // if (threadId < 1)
+    //   printf ("block = %d, blockLength = %d, firstBucket = %d, blockOffset = %d, blockStart = %d, numKs = %d\n", blockId, blockLength, firstBucket, blockOffset, blockStart, numKsPerBlock); 
     extern __shared__ uint array[];
     uint* offsets = (uint*) array;
     T* sharedVec = (T*) &offsets[numKsPerBlock];
     syncthreads();
     for (int i = threadId; i < blockLength; i += blockDim.x) {
       sharedVec[i] = d_vec[i + blockStart];
-      printf ("copied %lf from index %d, i = %d, blockLength = %d\n", d_vec[i + blockStart], i + blockStart, i, blockLength);
+      //printf ("copied %lf from index %d, i = %d, blockLength = %d\n", d_vec[i + blockStart], i + blockStart, i, blockLength);
     }
     syncthreads();
     if (threadId < 1) {
@@ -560,14 +560,14 @@ __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBl
         offsets[i] = d_bucketCount[firstBucket + i] + offsets[i - 1];
         //printf ("offsets[%d] = %d, added %d from block %d\n", i, offsets[i], d_bucketCount[firstBucket+i], blockId);
       }
-      printf ("PARTITIONING, numKsPerBlock = %d, blockLength = %d, firstBucket = %d\n", numKsPerBlock, blockLength, firstBucket);
+      //printf ("PARTITIONING, numKsPerBlock = %d, blockLength = %d, firstBucket = %d\n", numKsPerBlock, blockLength, firstBucket);
       for (int i = 0; i < blockLength; i++) {
         int j;
         int val = sharedVec[i];
         for (j = numKsPerBlock; minimums[j + blockOffset] > val && j > 0; j--);
-        printf ("MINIMUM = %lf\n", minimums[j + blockOffset]);
-        d_vec[i + blockStart] = sharedVec[i];
-        printf ("COPIED back %f to %d on block %d\n", sharedVec[i], i + blockStart, blockId);
+        //printf ("MINIMUM = %lf\n", minimums[j + blockOffset]);
+        d_vec[blockStart + offsets[j]] = sharedVec[i];
+        //printf ("COPIED back %f to %d on block %d\n", sharedVec[i], i + blockStart, blockId);
         offsets[j]++;
       } // end for
     } // end if (threadId < 1)
