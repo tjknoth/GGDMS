@@ -527,39 +527,43 @@ __global__ void printInput(int start, int end, T * newInput) {
    Notes with what seems to be going wrong:
    blockStart or blockOffset could be wrong. Oftentimes it seems like the minimums are bigger than they should be.
    Weird duplicates show up all over. Even on the first partition. They seem to replace things that should appear.
+   One test (multiple reps) mistakes are all in the same ballpark. Not identical, but within about .1
  */
 template  <typename T>
 __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBlocks, uint* numUniquePerBlock
                           , uint* uniqueBuckets, double* minimums, uint* d_bucketCount, uint numKs, uint* d_Kbounds) {
+  // Gather number of Ks for relevant block.
   int blockId = blockIdx.x;
   int numKsPerBlock = (blockId < numBlocks - 1) ? (numUniquePerBlock[blockId + 1] - numUniquePerBlock[blockId]) : numKs - numUniquePerBlock[numBlocks - 1];
-  //int altNumKsPerBlock = (blockId < numBlocks - 1) ? (d_Kbounds[blockId + 1] - d_Kbounds[blockId]) : numKs - d_Kbounds[numBlocks - 1]; 
-  
-  if (numKsPerBlock > 1) { //|| altNumKsPerBlock > 1) {
+
+  // Gather all required information about the block if it has multiple Ks.
+  if (numKsPerBlock > 1) {
+    
     int threadId = threadIdx.x;
-    // if (threadId < 1)
-    //   printf ("launched, block = %d\n", blockId);
     int blockOffset = (blockId > 0) ? numUniquePerBlock[blockId] : 0;
     int firstBucket = uniqueBuckets[blockOffset];
     int blockLength = 0;
+    // Sum number of elements in block from bucket sizes.
     for (int i = 0; i < numKsPerBlock; i++) {
       blockLength += d_bucketCount[uniqueBuckets[blockOffset + i]];
       //printf ("added %d from %d\n", d_bucketCount[uniqueBuckets[blockOffset + i]], uniqueBuckets[blockOffset + i]);
     }
     int blockStart = d_bucketBounds[blockOffset] - 1;
-    // if (threadId < 1)
-    //   printf ("blockStart= %d\n", blockStart);
-    // if (threadId < 1)
-    //   printf ("block = %d, blockLength = %d, firstBucket = %d, blockOffset = %d, blockStart = %d, numKs = %d\n", blockId, blockLength, firstBucket, blockOffset, blockStart, numKsPerBlock); 
+    if (threadId < 1)
+      printf ("block = %d, blockLength = %d, firstBucket = %d, blockOffset = %d, blockStart = %d, numKs = %d\n"
+              , blockId, blockLength, firstBucket, blockOffset, blockStart, numKsPerBlock); 
+    // Declare shared memory for all items in block as well as the bucket offsets
     extern __shared__ uint array[];
     uint* offsets = (uint*) array;
     T* sharedVec = (T*) &offsets[numKsPerBlock];
     syncthreads();
+    // Copy block into shared memory
     for (int i = threadId; i < blockLength; i += blockDim.x) {
       sharedVec[i] = d_vec[i + blockStart];
-      //printf ("copied %lf from index %d, i = %d, blockLength = %d\n", d_vec[i + blockStart], i + blockStart, i, blockLength);
+      printf ("copied %lf from index %d, i = %d, blockLength = %d\n", d_vec[i + blockStart], i + blockStart, i, blockLength);
     }
     syncthreads();
+    // Partition block in serial with a single thread
     if (threadId < 1) {
       //printf ("blockId = %d, numKsPerBlock = %d\n", blockId, numKsPerBlock);
       //printf ("firstBucket = %d, blockStart = %d, blockEnd = %d, blockId = %d\n", firstBucket, blockStart, blockEnd, blockId);
@@ -570,7 +574,8 @@ __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBl
         offsets[i] = d_bucketCount[firstBucket + i] + offsets[i - 1];
         //printf ("offsets[%d] = %d, added %d from block %d\n", i, offsets[i], d_bucketCount[uniqueBuckets[blockOffset+i]], blockId);
       }
-      //printf ("PARTITIONING, numKsPerBlock = %d, blockLength = %d, firstBucket = %d\n", numKsPerBlock, blockLength, firstBucket);
+      printf ("PARTITIONING, numKsPerBlock = %d, blockLength = %d, firstBucket = %d\n", numKsPerBlock, blockLength, firstBucket);
+      
       for (int i = 0; i < blockLength; i++) {
         int j;
         T val = sharedVec[i];
@@ -579,7 +584,7 @@ __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBl
         }
         //printf ("MINIMUM = %lf, prev min = %lf, j = %d\n", minimums[j + blockOffset], minimums[j + blockOffset -1], j);
         d_vec[blockStart + offsets[j]] = sharedVec[i];
-        //printf ("COPIED back %f to %d on block %d, bucket %d\n", sharedVec[i], offsets[j] + blockStart, blockId, j);
+        printf ("COPIED back %f to %d on block %d, bucket %d\n", sharedVec[i], offsets[j] + blockStart, blockId, j);
         offsets[j]++;
       } // end for
     } // end if (threadId < 1)

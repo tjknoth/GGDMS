@@ -34,7 +34,8 @@ compareMultiselect \
 analyzeMultiselect \
 realDataTests \
 compareMultiselectNew2 \
-compareMultiselectNewFindK
+compareMultiselectNewFindK \
+compareMultiselectEasy
 
 SMOS = \
 SMOStimingsOSDistrAll \
@@ -61,6 +62,13 @@ generateProblems.cu multiselectTimingFunctionsNew2.cu
 
 CompareMultiselectNewFindK = \
 compareMultiselectNewFindK.cu \
+bucketMultiselectNewFindK.cu naiveBucketMultiselect.cu \
+bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
+generateProblems.cu multiselectTimingFunctionsNew2.cu \
+recursionKernels.cu findk.cu
+
+CompareMultiselectEasy = \
+compareMultiselectEasy.cu \
 bucketMultiselectNewFindK.cu naiveBucketMultiselect.cu \
 bucketMultiselect_thrust.cu naiveBucketMultiselect.cu \
 generateProblems.cu multiselectTimingFunctionsNew2.cu \
@@ -126,6 +134,9 @@ compareMultiselectNew2: $(CompareMultiselectNew2)
 	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
 
 compareMultiselectNewFindK: $(CompareMultiselectNewFindK)
+	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@)
+
+compareMultiselectEasy: $(CompareMultiselectEasy)
 	$(NVCC) -o $@ $(NVCCFLAGS) moderngpu/src/mgpucontext.cu moderngpu/src/mgpuutil.cpp $(addsuffix .cu,$@) 
 
 analyzeMultiselect: $(AnalyzeMultiselect)

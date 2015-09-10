@@ -62,7 +62,7 @@ __global__ void recreateBuckets (uint * d_uniqueBuckets,
     newMinimums[index] = (oldBucket - precount) * width + shared_oldMinimums[oldBigBucket];
     newSlopes[index] = newNumSmallBuckets * oldSlope;
   } // end if(index<numUniqueBuckets)
-  if (threadIdx.x < 1) printf("\n********************************\n********************************\n\n");
+  //if (threadIdx.x < 1) printf("\n********************************\n********************************\n\n");
 } // end kernel recreateBuckets
 
 
