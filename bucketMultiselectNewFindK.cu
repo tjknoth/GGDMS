@@ -427,8 +427,88 @@ namespace BucketMultiselectNewFindK{
     } // ends if (idx < length)
   }  // ends copyElements_tree kernel
 
+  template <typename T>
+  __global__ void copyElementsByBlock (T* d_vector, int length, uint* d_bucketBounds, uint numBlocks
+                                       , uint* numUniquePerBlock, uint* uniqueBuckets, uint* d_bucketCount
+                                       , uint numKs, uint numThreadsPerBlock, uint* elementToBucket, T* newArray, uint newNumSmallBuckets
+                                       , int iter, uint* newReindexCounter) {
 
+    //int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int blockId = blockIdx.x;
+    int threadIndex = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int numKsPerBlock = (blockId < numBlocks - 1) ? (numUniquePerBlock[blockId + 1] - numUniquePerBlock[blockId]) : numKs - numUniquePerBlock[numBlocks - 1];
+    //if (idx < 1) printf ("cumulative sum: %u\n", d_bucketCount[newNumSmallBuckets * numBlocks - 1]);
+    
+    extern __shared__ uint sharedBuckets[];
+    //uint* inclusiveBlockSums = sharedBuckets[numKsPerBlock];
+    
+    //if (idx < 1) printf ("\nTEST = %d\n\n", iter);
+    
+    // Calculate necessary constants
+    int blockOffset = (blockId > 0) ? numUniquePerBlock[blockId] : 0;
+    int blockStart = d_bucketBounds[blockOffset];
+    int blockLength = (blockId < numKs - 1) ? d_bucketBounds[blockOffset + 1] - d_bucketBounds[blockOffset] : length - blockStart;
 
+    // Copy active buckets into shared memory and sum number of elements in block
+    if (threadIndex < 1) {
+      sharedBuckets[0] = uniqueBuckets[blockOffset];
+      //inclusiveBlockSums[0] = d_bucketCount[sharedBuckets[0]];
+      for (int i = 1; i < numKsPerBlock; i++) {
+        sharedBuckets[i] = uniqueBuckets[i + blockOffset];
+        d_bucketCount[sharedBuckets[i]] += d_bucketCount[sharedBuckets[i - 1]];
+        //printf ("d_bucketCount[%d] = %d\n", sharedBuckets[i], d_bucketCount[sharedBuckets[i]]);
+      }
+      //printf ("d_bucketCount[last index of block %d] = %d\n", blockId, d_bucketCount[sharedBuckets[numKsPerBlock-1]] + newReindexCounter[blockId]);
+    }
+
+    
+    //if (threadIndex < 1) printf ("block = %d, blockStart = %d, blockLength = %d, blockOffset = %d, newBuckets = %d\n", blockId, blockStart, blockLength, blockOffset, newNumSmallBuckets);
+    int minBucketIndex, maxBucketIndex, midBucketIndex, compare;
+    uint temp;
+
+    syncthreads();
+    if (blockId > numBlocks-3 && threadIndex < 1) printf ("block = %d, blockStart = %d, blockLength = %d, newBuckets = %d\n", blockId, blockStart, blockLength, newNumSmallBuckets);
+    
+    if ((threadIndex < blockLength) && (blockId < numBlocks)) {
+      for (int i = threadIndex; i < blockLength; i += numThreadsPerBlock) {     
+        temp = elementToBucket[i + blockStart];
+        minBucketIndex = 0;
+        maxBucketIndex = numKsPerBlock-1;
+        compare = 0;
+        //if (blockId == numBlocks-2) printf ("block = %d, blockStart = %d, blockLength = %d, newBuckets = %d\n", blockId, blockStart, blockLength, newNumSmallBuckets);
+        //thread divergence avoiding binary search over the markedBuckets to find a match quickly
+        for(int j = 1; j < numKsPerBlock; j*=2) {  
+          midBucketIndex = (maxBucketIndex + minBucketIndex) / 2;
+          compare = (temp > sharedBuckets[midBucketIndex]);
+          minBucketIndex = compare ? midBucketIndex : minBucketIndex;
+          maxBucketIndex = compare ? maxBucketIndex : midBucketIndex;
+        }
+        // Make the copy
+        //printf ("bucket index = %d\n", maxBucketIndex);
+        //if (blockId == numKs - 1) printf ("block = %d, temp = %d, sharedBuckets[%d] = %d\n", blockId, temp, maxBucketIndex, sharedBuckets[maxBucketIndex]);
+
+        // I'm missing some order stats each iteration because of indexing problems
+        
+        if (sharedBuckets[maxBucketIndex] == temp) {
+          //uint k = atomicDec(newReindexCounter + *(sharedBuckets + maxBucketIndex), blockLength) - 1;
+          uint k = newReindexCounter[blockId] + atomicDec(d_bucketCount + *(sharedBuckets + maxBucketIndex), blockLength) - 1; 
+          //newArray[atomicDec(d_bucketCount + sharedBuckets + maxBucketIndex, blockLength) - 1] = d_vector[i + blockStart];
+          printf ("Copying %.12f from %d to %d\n", d_vector[i + blockStart], i + blockStart, k);
+          newArray[k] = d_vector[i + blockStart];
+        }
+      } // end for
+    } // end if
+  }
+
+  template <typename T>
+  __global__ void devPrint (T* vec, int len) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < 1) {
+      for (int i = 0; i < len; i++)
+        printf ("output[%d] = %.12f      \n", i, vec[i]);
+    }
+  }
 
 
   /* This function speeds up the copying process the requested kVals by clustering them
@@ -1020,7 +1100,7 @@ namespace BucketMultiselectNewFindK{
       cudaDeviceSynchronize();
       SAFEcuda("recreateBuckets");
 
-      
+      /*
       if (test > 1) {
         //printf ("d_reindexCounter\n");
         //printNumUnique<<<numBlocks, threadsPerBlock>>>(d_numUniquePerBlock, numNewActive);
@@ -1034,7 +1114,7 @@ namespace BucketMultiselectNewFindK{
       }
       cudaDeviceSynchronize();
       SAFEcuda("sortBlock");
-
+      */
       //printDeviceMemory_uint<<<1,1>>>(d_bucketCount,"dbCount",15);
 
 
@@ -1134,13 +1214,29 @@ namespace BucketMultiselectNewFindK{
 
       pointerSwap<double>(&d_newMinimums,&d_oldMinimums);
 
-      int reducedlength = Reduction<T>(newInput, newInputAlt, d_elementToBucket, d_uniqueBuckets, d_oldReindexCounter, d_numUniquePerBlock, newInputLength, numOldActive, numNewActive);
-      SAFEcuda("Reduction");
+      //int reducedlength = Reduction<T>(newInput, newInputAlt, d_elementToBucket, d_uniqueBuckets, d_oldReindexCounter, d_numUniquePerBlock, newInputLength, numOldActive, numNewActive);
+      //SAFEcuda("Reduction");
+      printf ("CURRENT LENGTH = %d\n", newInputLength);
+      //printf ("Printing d_reindexCounter\n");
+      //devPrint<uint><<<numBlocks,threadsPerBlock>>>(d_reindexCounter,numKs * newNumSmallBuckets);
+      //cudaDeviceSynchronize();
+
+      // Exclusively sum d_bucketCount in order to access the first index of a given block
+      //cubDeviceInclusiveSum<uint>(d_bucketCount, d_bucketCount, newNumSmallBuckets * numOldActive);
+      //devPrint<uint><<<numBlocks,threadsPerBlock>>> (d_reindexCounter,numNewActive);
+      cudaDeviceSynchronize();
+      printf ("numOldActive = %d, newNumSmallBucket = %d, numNewActive = %d\n", numOldActive, newNumSmallBuckets, numNewActive);
+
+      copyElementsByBlock<T><<<numOldActive,threadsPerBlock,numKs*sizeof(uint)>>>(newInput, newInputLength, d_oldReindexCounter, numOldActive, d_numUniquePerBlock
+                                                                                  , d_uniqueBuckets, d_bucketCount, numKs, threadsPerBlock, d_elementToBucket
+                                                                                  , newInputAlt, newNumSmallBuckets, test, d_reindexCounter);
+      cudaDeviceSynchronize();
+      SAFEcuda("copyByBlock");
 
       //printKVals<<<1,1>>>(d_kVals,numKs);
 
-
-      cudaThreadSynchronize();
+      SAFEcuda ("test 0");
+      cudaDeviceSynchronize();
 
       // if (newInputLength < 600){
       //   printf("\n *** *** *** *** \n *** * Input * *** \n *** *** *** *** \n");
@@ -1185,11 +1281,11 @@ namespace BucketMultiselectNewFindK{
 
 
 
-
+      SAFEcuda("test 1");
 
       CUDA_CALL(cudaMemcpy(reindexCounter, d_reindexCounter, 
                            numKs * sizeof(uint), cudaMemcpyDeviceToHost));
-
+      SAFEcuda("test 2");
 
       // std::cout << "NewInputLengthAlt = " << newInputLengthAlt << "     reducedlength = " << reducedlength << std::endl;
 
@@ -1221,6 +1317,11 @@ namespace BucketMultiselectNewFindK{
       */
 
     }
+
+    printf ("\n\nNEW INPUT\n\n");
+    devPrint<T><<<numBlocks,threadsPerBlock>>>(newInput, newInputLength);
+    cudaDeviceSynchronize();
+    printf ("\n\nEND \n\n");
 
     cudaFree(d_pivots);
     cudaFree(d_pivottree);
@@ -1258,6 +1359,8 @@ namespace BucketMultiselectNewFindK{
     copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, newInput, d_kVals, d_kIndices, numKs);
     //    copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, newInputAlt, d_kVals, d_kIndices, numKs);
     SAFEcuda("copyValuesInChunk");
+
+    devPrint<T><<<numBlocks,threadsPerBlock>>>(d_output, numKs + kOffsetMin + kOffsetMax);
 
     CUDA_CALL(cudaMemcpy (output, d_output, 
                           (numKs + kOffsetMin + kOffsetMax) * sizeof (T), 

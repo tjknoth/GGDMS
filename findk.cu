@@ -193,9 +193,9 @@ inline int findKbucketsByBlock (uint * d_bucketCount, uint * d_bucketBounds, uin
   int numFindBlocks = (int) ceil((float)numOldActive/numFindThreads);
    
   // launch the kernel
-  findKbucketsByBlock_kernel<<<numFindBlocks,numFindThreads>>>(d_bucketCount, d_kVals, d_uniqueBuckets, d_sums, d_reindexsums
-                                                               , d_bucketBounds, d_Kbounds, numNewSmallBuckets, numOldActive
-                                                               , numKs,d_numUniquePerBlock, d_markedBucketFlags);
+  findKbucketsByBlock_kernel<<<numFindBlocks,numFindThreads
+    ,numKs*sizeof(uint)>>>(d_bucketCount, d_kVals, d_uniqueBuckets, d_sums, d_reindexsums, d_bucketBounds, d_Kbounds
+                           , numNewSmallBuckets, numOldActive, numKs,d_numUniquePerBlock, d_markedBucketFlags);
 
   // get the count of the last active buckeet
   CUDA_CALL(cudaMemcpy(&h_lastActiveCount, d_reindexsums+numKs-1, sizeof(uint), cudaMemcpyDeviceToHost));
@@ -560,7 +560,7 @@ __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBl
     // Copy block into shared memory
     for (int i = threadId; i < blockLength; i += blockDim.x) {
       sharedVec[i] = d_vec[i + blockStart];
-      printf ("copied %lf from index %d, i = %d, blockLength = %d\n", d_vec[i + blockStart], i + blockStart, i, blockLength);
+      printf ("copied %.12lf from index %d, i = %d, blockLength = %d\n", d_vec[i + blockStart], i + blockStart, i, blockLength);
     }
     syncthreads();
     // Partition block in serial with a single thread
@@ -584,7 +584,7 @@ __global__ void sortBlock(T* d_vec, int length, uint* d_bucketBounds, uint numBl
         }
         //printf ("MINIMUM = %lf, prev min = %lf, j = %d\n", minimums[j + blockOffset], minimums[j + blockOffset -1], j);
         d_vec[blockStart + offsets[j]] = sharedVec[i];
-        printf ("COPIED back %f to %d on block %d, bucket %d\n", sharedVec[i], offsets[j] + blockStart, blockId, j);
+        printf ("COPIED back %.12lf to %d on block %d, bucket %d\n", sharedVec[i], offsets[j] + blockStart, blockId, j);
         offsets[j]++;
       } // end for
     } // end if (threadId < 1)
