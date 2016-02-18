@@ -436,7 +436,7 @@ namespace BucketMultiselectNewFindK{
     //int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int blockId = blockIdx.x;
     int threadIndex = threadIdx.x;
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    //int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int numKsPerBlock = (blockId < numBlocks - 1) ? (numUniquePerBlock[blockId + 1] - numUniquePerBlock[blockId]) : numKs - numUniquePerBlock[numBlocks - 1];
     //if (idx < 1) printf ("cumulative sum: %u\n", d_bucketCount[newNumSmallBuckets * numBlocks - 1]);
     
@@ -468,7 +468,7 @@ namespace BucketMultiselectNewFindK{
     uint temp;
 
     syncthreads();
-    if (blockId > numBlocks-3 && threadIndex < 1) printf ("block = %d, blockStart = %d, blockLength = %d, newBuckets = %d\n", blockId, blockStart, blockLength, newNumSmallBuckets);
+    //if (blockId > numBlocks-3 && threadIndex < 1) printf ("block = %d, blockStart = %d, blockLength = %d, newBuckets = %d\n", blockId, blockStart, blockLength, newNumSmallBuckets);
     
     if ((threadIndex < blockLength) && (blockId < numBlocks)) {
       for (int i = threadIndex; i < blockLength; i += numThreadsPerBlock) {     
@@ -491,22 +491,22 @@ namespace BucketMultiselectNewFindK{
         // I'm missing some order stats each iteration because of indexing problems
         
         if (sharedBuckets[maxBucketIndex] == temp) {
-          //uint k = atomicDec(newReindexCounter + *(sharedBuckets + maxBucketIndex), blockLength) - 1;
-          uint k = newReindexCounter[blockId] + atomicDec(d_bucketCount + *(sharedBuckets + maxBucketIndex), blockLength) - 1; 
-          //newArray[atomicDec(d_bucketCount + sharedBuckets + maxBucketIndex, blockLength) - 1] = d_vector[i + blockStart];
-          printf ("Copying %.12f from %d to %d\n", d_vector[i + blockStart], i + blockStart, k);
-          newArray[k] = d_vector[i + blockStart];
+          //irrelevant: uint k = atomicDec(newReindexCounter + *(sharedBuckets + maxBucketIndex), blockLength) - 1;
+          //uint k = newReindexCounter[blockId] + atomicDec(d_bucketCount + *(sharedBuckets + maxBucketIndex), blockLength) - 1; 
+          newArray[newReindexCounter[blockId] + atomicDec(d_bucketCount + *(sharedBuckets + maxBucketIndex), blockLength) - 1] = d_vector[i + blockStart];
+          //printf ("Copying %.12f from %d to %d\n", d_vector[i + blockStart], i + blockStart, k);
+          //newArray[k] = d_vector[i + blockStart];
         }
       } // end for
     } // end if
   }
 
   template <typename T>
-  __global__ void devPrint (T* vec, int len) {
+  __global__ void devPrint (uint* vec, T* vec2, int len) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < 1) {
       for (int i = 0; i < len; i++)
-        printf ("output[%d] = %.12f      \n", i, vec[i]);
+        printf ("vec[%d] = %.15f, bucket[%d] = %d\n", i, vec2[i], i, vec[i]);
     }
   }
 
@@ -1078,7 +1078,10 @@ namespace BucketMultiselectNewFindK{
 
 
       // determine the number of buckets per new block
-      newNumSmallBuckets = min(11264,numBlocks*numBuckets/numNewActive);
+      //newNumSmallBuckets = min(11264,numBlocks*numBuckets/numNewActive);
+      newNumSmallBuckets = 2048;
+      //printf ("newNumSmallBuckets = %d\n", newNumSmallBuckets);
+      //newNumSmallBuckets = 8192;
       //    newNumSmallBuckets = numBuckets/numNewActive;
 
       // std::cout << "oldNumSmallBuckets = " << oldNumSmallBuckets << "     newNumSmallBuckets = " << newNumSmallBuckets << std::endl;
@@ -1089,7 +1092,7 @@ namespace BucketMultiselectNewFindK{
       recreateBlocks = (uint) ceil((float)numNewActive/recreateThreads);
 
 
-
+                                                      
       // Recreate sub-buckets
       recreateBuckets<T><<<recreateBlocks, recreateThreads
         , numOldActive*sizeof(double)*2>>>(d_uniqueBuckets, d_newSlopes, d_newMinimums
@@ -1129,7 +1132,9 @@ namespace BucketMultiselectNewFindK{
       cudaThreadSynchronize();
       SAFEcuda("reassignBuckets");
 
-
+      if (test >= 2)
+        devPrint<T><<<numBlocks, threadsPerBlock>>>(d_elementToBucket, newInput, newInputLength);
+      
       //Update variables for recursion
 
       //    tempReindex = d_oldReindexCounter;
@@ -1223,6 +1228,7 @@ namespace BucketMultiselectNewFindK{
 
       // Exclusively sum d_bucketCount in order to access the first index of a given block
       //cubDeviceInclusiveSum<uint>(d_bucketCount, d_bucketCount, newNumSmallBuckets * numOldActive);
+      printf ("d_reindexCounter: \n");
       //devPrint<uint><<<numBlocks,threadsPerBlock>>> (d_reindexCounter,numNewActive);
       cudaDeviceSynchronize();
       printf ("numOldActive = %d, newNumSmallBucket = %d, numNewActive = %d\n", numOldActive, newNumSmallBuckets, numNewActive);
@@ -1318,10 +1324,10 @@ namespace BucketMultiselectNewFindK{
 
     }
 
-    printf ("\n\nNEW INPUT\n\n");
-    devPrint<T><<<numBlocks,threadsPerBlock>>>(newInput, newInputLength);
+    //printf ("\n\nNEW INPUT\n\n");
+    //devPrint<T><<<numBlocks,threadsPerBlock>>>(newInput, newInputLength);
     cudaDeviceSynchronize();
-    printf ("\n\nEND \n\n");
+    //printf ("\n\nEND \n\n");
 
     cudaFree(d_pivots);
     cudaFree(d_pivottree);
@@ -1360,7 +1366,7 @@ namespace BucketMultiselectNewFindK{
     //    copyValuesInChunk<T><<<numBlocks, threadsPerBlock>>>(d_output, newInputAlt, d_kVals, d_kIndices, numKs);
     SAFEcuda("copyValuesInChunk");
 
-    devPrint<T><<<numBlocks,threadsPerBlock>>>(d_output, numKs + kOffsetMin + kOffsetMax);
+    //devPrint<T><<<numBlocks,threadsPerBlock>>>(d_output, numKs + kOffsetMin + kOffsetMax);
 
     CUDA_CALL(cudaMemcpy (output, d_output, 
                           (numKs + kOffsetMin + kOffsetMax) * sizeof (T), 

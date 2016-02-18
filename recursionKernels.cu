@@ -60,7 +60,9 @@ __global__ void recreateBuckets (uint * d_uniqueBuckets,
     oldSlope = shared_oldSlopes[oldBigBucket];
     width = 1 / oldSlope;
     newMinimums[index] = (oldBucket - precount) * width + shared_oldMinimums[oldBigBucket];
+    //printf ("newMins[%d] = %.12lf   ", index, (oldBucket - precount) * width + shared_oldMinimums[oldBigBucket]);
     newSlopes[index] = newNumSmallBuckets * oldSlope;
+    //printf ("newSlopes[%d] = %f     ", index, newNumSmallBuckets * oldSlope);
   } // end if(index<numUniqueBuckets)
   //if (threadIdx.x < 1) printf("\n********************************\n********************************\n\n");
 } // end kernel recreateBuckets
@@ -102,7 +104,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
   }  // end for loop on counts initialization
 
   syncthreads();
-
+  
   //deviceTag(1);
 
   // Since slope, minimum, and blockOffset are the same for every element in 
