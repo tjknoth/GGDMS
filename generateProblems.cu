@@ -6,7 +6,7 @@
  *  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
- *     
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -77,7 +77,7 @@ void generateUniformFloats(float *h_vec, uint numElements, curandGenerator_t gen
 }
 
 void generateNormalFloats(float* h_vec, uint numElements, curandGenerator_t generator){
-  float *d_generated;  
+  float *d_generated;
   uint undo=0;
 
   if (numElements%2){
@@ -170,9 +170,9 @@ void generateOnesTwosNoisyFloats(float* input, int length, int firstVal, int fir
 
   cudaMemcpy(input, devVec, sizeof(float)*length, cudaMemcpyDeviceToHost);
   cudaFree(devVec);
-} 
+}
 
-void generateOnesTwosFloats(float* input, uint length, curandGenerator_t gen) 
+void generateOnesTwosFloats(float* input, uint length, curandGenerator_t gen)
 {
   float* devVec;
   cudaMalloc(&devVec, sizeof(float) * length);
@@ -222,7 +222,7 @@ __global__ void vectorAdd(float* first, float* second, int length, int offset){
   int idx = blockDim.x * blockIdx.x + threadIdx.x;
   if(idx < length){
     int i;
-    
+
     for(i=idx; i<length; i+=offset){
       first[i] = first[i] + second[i];
     }
@@ -240,7 +240,7 @@ __global__ void CauchyTransformFloat(float* vec, int length, int offset) {
         vec[i] = 0.9999;
       if(vec[i] == 0)
         vec[i] = 0.0001;
-      
+
       vec[i] = tanf(CUDART_PI_F*(vec[i] - 0.5));
     }
   }
@@ -277,7 +277,7 @@ void generateNoisyVector(float* input, uint length, curandGenerator_t gen){
   }
 
   cudaMalloc(&devInput, sizeof(float)*length);
- 
+
   curandGenerateNormal(gen, devInput, length, 0.0, 0.01);
 
   //get device properties
@@ -318,7 +318,7 @@ void generateHugeUniformFloats(float* input, uint length, curandGenerator_t gen)
   float* devInput;
   cudaMalloc(&devInput, sizeof(float) * length);
 
-  
+
   curandGenerateUniform(gen, devInput, length);
   thrust::device_ptr<float> dev_ptr(devInput);
   thrust::for_each( dev_ptr, dev_ptr + length, multiplyByMillion());
@@ -368,7 +368,7 @@ void generateHalfNormalFloats(float* input, uint length, curandGenerator_t gen){
     length++;
     undo++;
   }
-  
+
   cudaMalloc(&devInput, sizeof(float) * length);
 
   curandGenerateNormal(gen, devInput, length, 0.0, 1.0);
@@ -409,7 +409,7 @@ void generateBucketKillerFloats(float *h_vec, uint numElements, curandGenerator_
   thrust::for_each( dev_ptr, dev_ptr + numElements, makeSmallFloat());
   thrust::sort(dev_ptr,dev_ptr + numElements);
   cudaMemcpy(h_vec, d_generated, numElements * sizeof(float), cudaMemcpyDeviceToHost);
- 
+
   for(i = -126; i < 127; i++){
     h_vec[i + 126] = pow(2.0,(float)i);
   }
@@ -476,7 +476,7 @@ void generateBucketKillerDoubles(double *h_vec, uint numElements, curandGenerato
    thrust::for_each( dev_ptr, dev_ptr + numElements, makeSmallDouble());
    thrust::sort(dev_ptr,dev_ptr + numElements);
    cudaMemcpy(h_vec, d_generated, numElements * sizeof(double), cudaMemcpyDeviceToHost);
- 
+
    for(i = -1022; i < 1023; i++){
      h_vec[i + 1022] = pow(2.0,(double)i);
    }
@@ -552,14 +552,14 @@ void generateKUniformRandom (uint * kList, uint kListCount, uint vectorSize, cur
   float * randomFloats = (float *) malloc (kListCount * sizeof (float));
   float * d_randomFloats;
   cudaMalloc (&d_randomFloats, sizeof (float) * kListCount);
-  
+
   curandGenerateUniform (generator, d_randomFloats, kListCount);
 
   cudaMemcpy (randomFloats, d_randomFloats, kListCount * sizeof (float), cudaMemcpyDeviceToHost);
 
   for (int i = 0; i < kListCount; i++)
     kList[i] = (uint) (randomFloats[i] * (float) vectorSize);
-    
+
   cudaFree (d_randomFloats);
   free (randomFloats);
 }
@@ -591,7 +591,7 @@ void generateKNormal (uint * kList, uint kListCount, uint vectorSize, curandGene
   }
 
   cudaMalloc (&d_randomFloats, sizeof (float) * kListCount);
-  
+
   curandGenerateNormal (generator, d_randomFloats, kListCount, 0, 1);
 
   if (undo)
@@ -599,7 +599,7 @@ void generateKNormal (uint * kList, uint kListCount, uint vectorSize, curandGene
 
   cudaMemcpy (randomFloats, d_randomFloats, kListCount * sizeof (float), cudaMemcpyDeviceToHost);
 
-  for (int i = 0; i < kListCount; i++) 
+  for (int i = 0; i < kListCount; i++)
     kList[i] = (uint) ((abs (randomFloats[i]) + 7) * (vectorSize / 14.0));
 
   cudaFree (d_randomFloats);
@@ -612,7 +612,7 @@ void generateKCluster (uint * kList, uint kListCount, uint vectorSize, curandGen
   float * d_randomFloats;
 
   cudaMalloc (&d_randomFloats, sizeof (float) * ( (kListCount / 9) + 1 ));
-  
+
   curandGenerateUniform (generator, d_randomFloats, ( (kListCount / 9) + 1 ));
 
   cudaMemcpy (randomFloats, d_randomFloats, sizeof (float) * ( (kListCount / 9) + 1 ), cudaMemcpyDeviceToHost);
@@ -620,7 +620,7 @@ void generateKCluster (uint * kList, uint kListCount, uint vectorSize, curandGen
   int floatIndex = 0;
   int maxassigned=0;
   for (int i = 4; i < kListCount; i+=9) {
-   
+
     kList[i] = (uint) (randomFloats[floatIndex++] * (vectorSize - 10) + 5);
 
     for (uint j = 1; j < 5; j++) {
@@ -635,7 +635,7 @@ void generateKCluster (uint * kList, uint kListCount, uint vectorSize, curandGen
   // To ensure the full kList has appropriate assignments, we fill in the end of the Klist if needed.
   if (maxassigned < kListCount-1){
     kList[maxassigned+1] = (uint) (randomFloats[floatIndex++] * (vectorSize - 10) + 5);
-    for (int j = maxassigned+2; j<kListCount; j++){ 
+    for (int j = maxassigned+2; j<kListCount; j++){
       kList[j] = min(kList[j-1]+1,vectorSize-1);
     } // end for(j=maxassigned)
   } // end if(maxassigned)
@@ -649,9 +649,9 @@ void generateKSectioned (uint * kList, uint kListCount, uint vectorSize, curandG
   float * d_randomFloat;
 
   cudaMalloc (&d_randomFloat, sizeof (float));
-  
+
   curandGenerateUniform (generator, d_randomFloat, 1);
- 
+
   cudaMemcpy (randomFloat, d_randomFloat, sizeof (float), cudaMemcpyDeviceToHost);
 
   kList[0] = (uint) (*randomFloat * (vectorSize - kListCount));
@@ -674,7 +674,7 @@ char* namesOfKGenerators[NUMBEROFKDISTRIBUTIONS] = {"Uniform Random Ks", "Unifor
 void printKDistributionOptions(){
   PrintFunctions::printArray(namesOfKGenerators, NUMBEROFKDISTRIBUTIONS);
   /*
-  for(int i=0; i< NUMBEROFKDISTRIBUTIONS; i++) 
+  for(int i=0; i< NUMBEROFKDISTRIBUTIONS; i++)
     printf("%d- %s\n", i+1, namesOfKGenerators[i]);
   */
 }
