@@ -183,6 +183,7 @@ sortcompare: $(sortcompare)
 
 clean:
 	rm -rf $(PROGRAMS) *~ *.o
+	rm -rf *k-dist*
 
 cleanSMOS:
 	rm -rf $(SMOS) *~ *.o
