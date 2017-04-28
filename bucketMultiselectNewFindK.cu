@@ -506,7 +506,7 @@ namespace BucketMultiselectNewFindK{
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < 1) {
       for (int i = 0; i < len; i++)
-        printf ("vec[%d] = %u, bucket[%d] = %d\n", i, vec2[i], i, vec[i]);
+        printf ("vec[%u] = %u, bucket[%u] = %d\n", i, vec2[i], i, vec[i]);
     }
   }
 
@@ -1396,7 +1396,7 @@ namespace BucketMultiselectNewFindK{
    */
   template <typename T>
   T bucketMultiselectWrapper (T * d_vector, int length, uint * kVals_ori, int numKs
-                              , T * outputs, int blocks, int threads) {
+                              , T * outputs, int bloocks, int threads) {
 
     int numBuckets = 8192;
     uint kVals[numKs];
