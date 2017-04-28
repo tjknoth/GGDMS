@@ -19,7 +19,7 @@ CDP = -DCUB_CDP
 
 # Common flags
  COMMONFLAGS += $(INCLUDES)
- COMMONFLAGS += -g
+ COMMONFLAGS += -g -G
 # Compilers
 NVCCFLAGS += $(COMMONFLAGS)
 NVCCFLAGS += $(ARCH)
