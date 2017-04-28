@@ -26,7 +26,7 @@ __global__ void printInput(T * vector,int length){
 }
 
 template <typename T>
-__global__ void recreateBuckets (uint * d_uniqueBuckets, 
+__global__ void recreateBuckets (uint * d_uniqueBuckets,
                                  double * newSlopes, double * newMinimums, const uint numNewActive,
                                  double * oldSlopes, double * oldMinimums, const uint numOldActive,
                                  const uint oldNumSmallBuckets, const uint newNumSmallBuckets)
@@ -49,7 +49,7 @@ __global__ void recreateBuckets (uint * d_uniqueBuckets,
   for (int i = threadIndex; i < numOldActive; i += numThreadsPerBlock) {
     shared_oldMinimums[i] = oldMinimums[i];
     shared_oldSlopes[i] = oldSlopes[i];
-  } // end for 
+  } // end for
 
   syncthreads();
 
@@ -97,17 +97,17 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
   syncthreads();
   // declare shared memory counter as counts
   extern __shared__ uint counts[];
-   
+
   // Initialize counts to zero
   for (int i = threadIndex; i < newNumSmallBuckets; i+=numThreadsPerBlock) {
     counts[i] = 0;
   }  // end for loop on counts initialization
 
   syncthreads();
-  
+
   //deviceTag(1);
 
-  // Since slope, minimum, and blockOffset are the same for every element in 
+  // Since slope, minimum, and blockOffset are the same for every element in
   // the same block, copy them to shared memory for fast access
 
   __shared__ double slope;
@@ -129,7 +129,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
     //		printf("\n******\n blockIdx.x = %d\n******\nslope = %lf\tminimum = %lf\tblockBucketOffset = %d\tblockStart = %d\tblockEnd = %d\n"
     //			,blockIdx.x,slope,minimum,blockBucketOffset,blockStart,blockEnd);
 
-  }  // end if threadIndex<1 for shared memory constants 
+  }  // end if threadIndex<1 for shared memory constants
 
   syncthreads();
 
@@ -139,7 +139,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
     syncthreads();
     // declare shared memory counter as counts
     extern __shared__ uint counts[];
-   
+
     // Initialize counts to zero
     for (int i = threadIndex; i < newNumSmallBuckets; i+=numThreadsPerBlock) {
     counts[i] = 0;
@@ -148,7 +148,7 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 
     syncthreads();
   */
-	
+
   // assign elements in this block to appropriate buckets
   for (int i = blockStart + threadIndex; i < blockEnd; i += numThreadsPerBlock) {
 
@@ -169,19 +169,21 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
     }
     if (localBucket > newNumSmallBuckets - 1) {
       localBucket = newNumSmallBuckets-1;  // ensure local bucket stays within this block
-    } 
-       
+    }
+
     // assign this element to the correct bucket
     elementToBucket[i] = localBucket + blockBucketOffset;
     // increment the local counter
-    atomicInc(counts + localBucket, vecLength); 
+    atomicInc(counts + localBucket, vecLength);
 
   } // end for i=blockStart ...
 
   syncthreads();
 
+  printf ("newNumSmallBuckets = %d\n\n\n", newNumSmallBuckets)
   // Copy the local counts to the global device d_bucketCount with appropriate offset
   for (int i = threadIndex; i < newNumSmallBuckets; i+=numThreadsPerBlock) {
+    printf ("copying to %d from $d on block %d   ", i + blockBucketOffset, i, blockIndex)
     bucketCount[i + blockBucketOffset] = counts[i];
   }  // end for loop on counts copy to global device memory
 
@@ -243,7 +245,7 @@ __global__ void correctBuckets(uint * d_numUniquePerBlock, T * newInput, T * new
 
   __shared__ int blockNumKs;
   __shared__ int start;
-  __shared__ int end;	
+  __shared__ int end;
 
 
   if(blockIdx.x < numOldActive - 1) {
@@ -272,9 +274,9 @@ __global__ void correctBuckets(uint * d_numUniquePerBlock, T * newInput, T * new
     syncthreads();
 
 
-			
 
-  
+
+
 
   }
 }
@@ -342,5 +344,3 @@ __global__ void checkInput(T* newInput, int newInputLength, int tag){
     if (newInput[i] < 0.00000001) printf("Tag %d \t newInput[%d] = 0\n",tag,i);
   }
 }
-
-
