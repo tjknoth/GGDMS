@@ -916,7 +916,7 @@ namespace BucketMultiselectNewFindK{
     /// **** Using the function assignSmartBucket
     /// ***********************************************************
     timing(0,3);
-    SAFEcuda("beforeAssignSmartBucket");
+
     //Distribute elements into their respective buckets
     assignSmartBucket<T><<<numBlocks, threadsPerBlock, 2 * numPivots * sizeof(T) +
       + numPivots * sizeof(double) + numBuckets * sizeof(uint)>>>
@@ -1232,7 +1232,7 @@ namespace BucketMultiselectNewFindK{
       //devPrint<uint><<<numBlocks,threadsPerBlock>>> (d_reindexCounter,numNewActive);
       cudaDeviceSynchronize();
       printf ("numOldActive = %d, newNumSmallBucket = %d, numNewActive = %d\n", numOldActive, newNumSmallBuckets, numNewActive);
-      
+
       copyElementsByBlock<T><<<numOldActive,threadsPerBlock,numKs*sizeof(uint)>>>(newInput, newInputLength, d_oldReindexCounter, numOldActive, d_numUniquePerBlock
                                                                                   , d_uniqueBuckets, d_bucketCount, numKs, threadsPerBlock, d_elementToBucket
                                                                                   , newInputAlt, newNumSmallBuckets, test, d_reindexCounter);

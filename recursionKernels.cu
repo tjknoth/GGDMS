@@ -180,10 +180,8 @@ __global__ void reassignBuckets (T * vector, const int vecLength, uint * bucketB
 
   syncthreads();
 
-  printf ("newNumSmallBuckets = %d\n\n\n", newNumSmallBuckets)
   // Copy the local counts to the global device d_bucketCount with appropriate offset
   for (int i = threadIndex; i < newNumSmallBuckets; i+=numThreadsPerBlock) {
-    printf ("copying to %d from $d on block %d   ", i + blockBucketOffset, i, blockIndex)
     bucketCount[i + blockBucketOffset] = counts[i];
   }  // end for loop on counts copy to global device memory
 
