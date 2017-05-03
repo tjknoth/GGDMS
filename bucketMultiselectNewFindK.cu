@@ -1078,8 +1078,8 @@ namespace BucketMultiselectNewFindK{
 
 
       // determine the number of buckets per new block
-      //newNumSmallBuckets = min(11264,numBlocks*numBuckets/numNewActive);
-      newNumSmallBuckets = 2048;
+      newNumSmallBuckets = min(11264,numBlocks*numBuckets/numNewActive);
+      //newNumSmallBuckets = 2048;
       //printf ("newNumSmallBuckets = %d\n", newNumSmallBuckets);
       //newNumSmallBuckets = 8192;
       //    newNumSmallBuckets = numBuckets/numNewActive;
@@ -1094,6 +1094,7 @@ namespace BucketMultiselectNewFindK{
 
 
       // Recreate sub-buckets
+      //printf ("Before recreate: newNumSmallBuckets = %d, numBlocks = %d, numBuckets = %d\n", newNumSmallBuckets, numBlocks, numBuckets);
       recreateBuckets<T><<<recreateBlocks, recreateThreads
         , numOldActive*sizeof(double)*2>>>(d_uniqueBuckets, d_newSlopes, d_newMinimums
                                            , numNewActive, d_oldSlopes, d_oldMinimums, numOldActive
@@ -1121,7 +1122,7 @@ namespace BucketMultiselectNewFindK{
       //printDeviceMemory_uint<<<1,1>>>(d_bucketCount,"dbCount",15);
 
 
-
+      //printf ("Before reassign: newNumSmallBuckets = %d, numBlocks = %d, numBuckets = %d", newNumSmallBuckets, numBlocks, numBuckets);
       reassignBuckets<T><<<numNewActive, threadsPerBlock
         , newNumSmallBuckets*sizeof(uint)>>>(newInput, newInputLength, d_reindexCounter, d_newSlopes
                                              , d_newMinimums, numNewActive, newNumSmallBuckets
@@ -1132,8 +1133,8 @@ namespace BucketMultiselectNewFindK{
       cudaThreadSynchronize();
       SAFEcuda("reassignBuckets");
 
-      if (test >= 2)
-        devPrint<T><<<numBlocks, threadsPerBlock>>>(d_elementToBucket, newInput, newInputLength);
+      //if (test >= 2) 
+        //devPrint<T><<<numBlocks, threadsPerBlock>>>(d_elementToBucket, newInput, newInputLength);
 
       //Update variables for recursion
 
@@ -1221,18 +1222,19 @@ namespace BucketMultiselectNewFindK{
 
       //int reducedlength = Reduction<T>(newInput, newInputAlt, d_elementToBucket, d_uniqueBuckets, d_oldReindexCounter, d_numUniquePerBlock, newInputLength, numOldActive, numNewActive);
       //SAFEcuda("Reduction");
-      printf ("CURRENT LENGTH = %d\n", newInputLength);
+      //printf ("CURRENT LENGTH = %d\n", newInputLength);
       //printf ("Printing d_reindexCounter\n");
       //devPrint<uint><<<numBlocks,threadsPerBlock>>>(d_reindexCounter,numKs * newNumSmallBuckets);
       //cudaDeviceSynchronize();
 
       // Exclusively sum d_bucketCount in order to access the first index of a given block
       //cubDeviceInclusiveSum<uint>(d_bucketCount, d_bucketCount, newNumSmallBuckets * numOldActive);
-      printf ("d_reindexCounter: \n");
+      //printf ("d_reindexCounter: \n");
       //devPrint<uint><<<numBlocks,threadsPerBlock>>> (d_reindexCounter,numNewActive);
       cudaDeviceSynchronize();
-      printf ("numOldActive = %d, newNumSmallBucket = %d, numNewActive = %d\n", numOldActive, newNumSmallBuckets, numNewActive);
 
+      //printf ("numOldActive = %d, newNumSmallBucket = %d, numNewActive = %d\n", numOldActive, newNumSmallBuckets, numNewActive);
+      
       copyElementsByBlock<T><<<numOldActive,threadsPerBlock,numKs*sizeof(uint)>>>(newInput, newInputLength, d_oldReindexCounter, numOldActive, d_numUniquePerBlock
                                                                                   , d_uniqueBuckets, d_bucketCount, numKs, threadsPerBlock, d_elementToBucket
                                                                                   , newInputAlt, newNumSmallBuckets, test, d_reindexCounter);
